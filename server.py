@@ -56,6 +56,15 @@ app = FastAPI(title="Mini Agent Web UI")
 _context = Context()
 
 
+# ── 认证辅助 ──────────────────────────────────────────────────
+def _get_user(request: Request) -> dict | None:
+    """从请求头提取当前登录用户"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return None
+    return db.get_user_by_token(token)
+
+
 @app.on_event("startup")
 async def startup():
     """初始化数据库"""
@@ -88,17 +97,23 @@ async def auth_page():
 
 # ── 模型 API ──────────────────────────────────────────────────
 @app.get("/api/models")
-async def list_models():
-    """获取所有模型及状态"""
+async def list_models(request: Request):
+    """获取所有模型及状态（按当前用户 Key）"""
     cfg = get_config()
+    user = _get_user(request)
+    user_id = user["id"] if user else None
     models = []
     for name, m in cfg.models.items():
+        has_key = bool(m.api_key)
+        # 如果全局没 Key，检查用户的 Key
+        if not has_key and user_id:
+            has_key = db.has_user_key(user_id, name)
         models.append({
             "name": name,
             "description": m.description,
             "model": m.model,
             "base_url": m.base_url,
-            "has_key": bool(m.api_key),
+            "has_key": has_key,
             "current": name == cfg.current_model.name,
         })
     return {"models": models, "current": cfg.current_model.name}
@@ -127,13 +142,14 @@ async def chat(request: Request):
     if not user_message:
         return JSONResponse({"error": "消息不能为空"}, status_code=400)
 
-    # 验证登录
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token or not db.get_user_by_token(token):
+    # 验证登录 + 获取用户 Key
+    user = _get_user(request)
+    if not user:
         return JSONResponse({"error": "请先登录"}, status_code=401)
+    user_api_key = db.get_user_api_key(user["id"], get_config().current_model.name)
 
     return StreamingResponse(
-        _stream_chat(user_message),
+        _stream_chat(user_message, user_api_key),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -143,13 +159,14 @@ async def chat(request: Request):
     )
 
 
-async def _stream_chat(user_message: str) -> AsyncGenerator[str, None]:
+async def _stream_chat(user_message: str, user_api_key: str | None = None) -> AsyncGenerator[str, None]:
     """流式生成聊天回复"""
     cfg = get_config()
     model_name = cfg.current_model.name
-    
-    # 检查 Key
-    if not cfg.current_model.api_key:
+
+    # 检查 Key（优先用户 Key，其次全局 Key）
+    api_key = user_api_key or cfg.current_model.api_key
+    if not api_key:
         yield f"data: {json.dumps({'type': 'error', 'content': f'❌ 模型 \"{model_name}\" 未设置 API Key，请在设置中配置'})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
@@ -158,13 +175,11 @@ async def _stream_chat(user_message: str) -> AsyncGenerator[str, None]:
     yield f"data: {json.dumps({'type': 'start', 'model': model_name})}\n\n"
 
     try:
-        # 执行 agent（非流式版，因为 run_agent 返回完整结果）
-        # 我们用一个包装来模拟流式输出
+        # 执行 agent
         global _context
         _context.add_user(user_message)
         tools = registry.get_schemas()
 
-        # 执行工具调用环
         from core import llm
 
         turn = 0
@@ -176,6 +191,7 @@ async def _stream_chat(user_message: str) -> AsyncGenerator[str, None]:
             response = llm.chat(
                 messages=_context.get_messages(),
                 tools=tools,
+                api_key_override=api_key,
             )
 
             if not response.tool_calls:
@@ -228,35 +244,42 @@ async def _stream_chat(user_message: str) -> AsyncGenerator[str, None]:
 # ── Key 管理 API ──────────────────────────────────────────────
 @app.post("/api/key/set")
 async def key_set(request: Request):
-    """保存 API Key 到加密存储"""
+    """保存当前用户的 API Key"""
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "请先登录"}, status_code=401)
     data = await request.json()
     model_name = data.get("model", "")
     api_key = data.get("key", "")
     if not model_name or not api_key:
         return JSONResponse({"error": "模型名和 Key 不能为空"}, status_code=400)
-    keyring.save_key(model_name, api_key)
-    reload_config()
-    return {"message": f"✅ Key 已加密保存", "model": model_name}
+    db.set_user_key(user["id"], model_name, api_key)
+    return {"message": f"✅ Key 已保存（仅当前账号可用）", "model": model_name}
 
 
 @app.post("/api/key/remove")
 async def key_remove(request: Request):
-    """删除 Key"""
+    """删除当前用户的 Key"""
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "请先登录"}, status_code=401)
     data = await request.json()
     model_name = data.get("model", "")
     if not model_name:
         return JSONResponse({"error": "模型名不能为空"}, status_code=400)
-    if keyring.delete_key(model_name):
-        reload_config()
+    if db.delete_user_key(user["id"], model_name):
         return {"message": f"已删除 {model_name} 的 Key"}
     return JSONResponse({"error": f"{model_name} 没有保存的 Key"}, status_code=404)
 
 
 @app.get("/api/key/list")
-async def key_list():
-    """列出已保存 Key 的模型"""
-    keys = keyring.list_keys()
-    return {"keys": keys, "file": str(keyring.KEYRING_FILE)}
+async def key_list(request: Request):
+    """列出当前用户的 Key"""
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "请先登录"}, status_code=401)
+    keys = db.list_user_keys(user["id"])
+    return {"keys": keys}
 
 
 # ── 对话管理 ──────────────────────────────────────────────────

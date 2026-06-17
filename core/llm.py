@@ -51,6 +51,7 @@ def chat(
     tools: list[dict] | None = None,
     temperature: float = 0.7,
     model_cfg: Optional[ModelConfig] = None,
+    api_key_override: str | None = None,
 ) -> LLMResponse:
     """
     最核心的函数：一次 LLM Chat Completion 调用
@@ -59,8 +60,8 @@ def chat(
       messages    — 对话上下文
       tools       — 工具定义（可用的工具清单）
       temperature — 温度参数
-      model_cfg   — 模型配置（可选）。不传则使用 config/models.json 中的当前模型，
-                    或者回退到环境变量 OPENAI_API_KEY / LLM_MODEL / OPENAI_BASE_URL
+      model_cfg   — 模型配置（可选）
+      api_key_override — 覆盖 API Key（用于用户独立 Key 的场景）
     
     参数 raw 到 HTTP 请求的映射：
       messages → body["messages"]    —— 对话上下文
@@ -72,13 +73,13 @@ def chat(
     """
     # 确定使用哪个模型配置
     cfg = model_cfg or _get_active_cfg()
+    effective_key = api_key_override or cfg.api_key
 
-    if not cfg.api_key:
+    if not effective_key:
         raise ValueError(
             f"模型 '{cfg.name}' 未设置 API Key。\n"
-            f"请确保环境变量已设置（config/models.json 引用了 ${cfg.api_key[:20] or '???'}），\n"
-            f"或直接设置 OPENAI_API_KEY 环境变量。\n"
-            f"例如: export {_find_env_var_for(cfg.name)}='sk-xxx'"
+            f"请在设置中为当前账号配置 Key，"
+            f"或设置环境变量 {_find_env_var_for(cfg.name)}。\n"
         )
 
     # 构建请求体 — 这就是你在 API 文档里看到的那个 JSON
@@ -99,7 +100,7 @@ def chat(
         resp = client.post(
             f"{cfg.base_url}/chat/completions",
             headers={
-                "Authorization": f"Bearer {cfg.api_key}",
+                "Authorization": f"Bearer {effective_key}",
                 "Content-Type": "application/json",
             },
             json=body,

@@ -88,10 +88,17 @@ def init_db():
             display_name VARCHAR(64) DEFAULT '',
             verified BOOLEAN DEFAULT FALSE,
             token VARCHAR(64) DEFAULT '',
+            api_keys JSONB DEFAULT '{}',
             created_at TIMESTAMP DEFAULT NOW(),
             last_login TIMESTAMP
         )
     """)
+
+    # 迁移：给已有表加 api_keys 列（兼容旧表）
+    try:
+        cur2.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS api_keys JSONB DEFAULT '{}'")
+    except Exception:
+        pass
 
     cur2.execute("""
         CREATE TABLE IF NOT EXISTS verification_codes (
@@ -309,3 +316,81 @@ def verify_code(email: str, code: str, purpose: str = "register") -> bool:
     finally:
         cur.close()
         conn.close()
+
+
+# ── 用户 Key 管理（每个用户独立）──────────────────────────────────
+def get_user_keys(user_id: int) -> dict:
+    """获取用户保存的所有 API Key"""
+    conn = psycopg2.connect(
+        host=PG_HOST, port=PG_PORT,
+        user=PG_USER, password=PG_PASSWORD,
+        dbname=PG_DATABASE,
+    )
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("SELECT api_keys FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        if row and row.get("api_keys"):
+            return dict(row["api_keys"])
+        return {}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def set_user_key(user_id: int, model_name: str, api_key: str):
+    """保存用户的某个模型 Key"""
+    conn = psycopg2.connect(
+        host=PG_HOST, port=PG_PORT,
+        user=PG_USER, password=PG_PASSWORD,
+        dbname=PG_DATABASE,
+    )
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        import json
+        cur.execute(
+            "UPDATE users SET api_keys = jsonb_set(COALESCE(api_keys, '{}'::jsonb), %s, %s::jsonb) WHERE id = %s",
+            (f"{{{model_name}}}", json.dumps(api_key), user_id)
+        )
+    finally:
+        cur.close()
+        conn.close()
+
+
+def delete_user_key(user_id: int, model_name: str) -> bool:
+    """删除用户的某个模型 Key"""
+    conn = psycopg2.connect(
+        host=PG_HOST, port=PG_PORT,
+        user=PG_USER, password=PG_PASSWORD,
+        dbname=PG_DATABASE,
+    )
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE users SET api_keys = api_keys - %s WHERE id = %s",
+            (model_name, user_id)
+        )
+        return cur.rowcount > 0
+    finally:
+        cur.close()
+        conn.close()
+
+
+def list_user_keys(user_id: int) -> list[str]:
+    """列出用户已保存 Key 的模型名"""
+    keys = get_user_keys(user_id)
+    return list(keys.keys())
+
+
+def has_user_key(user_id: int, model_name: str) -> bool:
+    """检查用户是否有某个模型的 Key"""
+    keys = get_user_keys(user_id)
+    return model_name in keys
+
+
+def get_user_api_key(user_id: int, model_name: str) -> str | None:
+    """获取用户指定模型的 Key"""
+    keys = get_user_keys(user_id)
+    return keys.get(model_name)
