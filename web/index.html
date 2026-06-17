@@ -271,8 +271,9 @@
     width: 480px;
     max-width: 90vw;
     max-height: 80vh;
-    overflow-y: auto;
     padding: 24px;
+    display: flex;
+    flex-direction: column;
   }
   .settings-panel h2 {
     font-size: 18px;
@@ -378,7 +379,6 @@
     <span id="modelStatus" style="font-size:12px;color:var(--text2)"></span>
     <select id="modelSelector" class="model-select"></select>
     <button class="btn btn-sm" onclick="resetChat()">↺</button>
-    <button class="btn btn-sm" onclick="openProfile('keys')">⚙</button>
     <button class="btn btn-sm" onclick="openProfile('info')" id="profileBtn" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--primary)">
       <span id="headerAvatarFallback" style="font-size:14px;color:white;display:flex;align-items:center;justify-content:center;width:100%;height:100%">👤</span>
       <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('headerAvatarFallback').style.display='flex'">
@@ -412,13 +412,15 @@
     </h2>
 
     <!-- Tab bar -->
-    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;margin-top:16px">
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;margin-top:16px;flex-shrink:0">
       <button class="profile-tab active" data-tab="info" onclick="switchProfileTab('info')">👤 个人信息</button>
       <button class="profile-tab" data-tab="keys" onclick="switchProfileTab('keys')">🔑 API Key</button>
     </div>
 
-    <!-- Tab: 个人信息 -->
-    <div id="profileTabInfo" class="profile-tab-content active">
+    <!-- Tab 内容（共享滚动容器，确保两个 Tab 高度一致） -->
+    <div style="flex:1;overflow-y:auto;min-height:0">
+      <!-- Tab: 个人信息 -->
+      <div id="profileTabInfo" class="profile-tab-content active">
       <div class="settings-section">
         <div style="text-align:center;padding:12px 0">
           <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:32px;color:white;margin:0 auto 8px;overflow:hidden;position:relative;cursor:pointer" id="profileAvatar" onclick="document.getElementById('avatarInput').click()" title="点击更换头像">
@@ -460,6 +462,7 @@
           代码: <a href="https://github.com/theking0912/mini-agent" target="_blank" style="color:var(--primary)">github.com/theking0912/mini-agent</a>
         </p>
       </div>
+    </div>
     </div>
   </div>
 </div>
