@@ -1,0 +1,13 @@
+{
+  "name": "Mini Agent",
+  "image": "mcr.microsoft.com/devcontainers/python:3.13",
+  "postCreateCommand": "pip install httpx duckduckgo-search",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      },
+      "extensions": ["ms-python.python"]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install httpx duckduckgo-search
+
+      - name: Syntax check
+        run: |
+          python -m py_compile agent.py
+          python -m py_compile core/llm.py
+          python -m py_compile core/context.py
+          python -m py_compile core/tool_runner.py
+          python -m py_compile tools/registry.py
+          python -m py_compile tools/calculator.py
+          python -m py_compile tools/file_tool.py
+          python -m py_compile tools/web_search.py
+          echo "All files pass syntax check"
+
+      - name: Import & registry test
+        run: python scripts/test_imports.py
