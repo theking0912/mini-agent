@@ -128,8 +128,6 @@ async def switch_model(request: Request):
     if name not in cfg.models:
         return JSONResponse({"error": f"未知模型: {name}"}, status_code=400)
     msg = cfg.switch(name)
-    # 重新加载配置确保 Key 状态更新
-    reload_config()
     return {"message": msg, "current": name}
 
 
