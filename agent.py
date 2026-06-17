@@ -34,6 +34,7 @@ from core.context import Context
 from core.tool_runner import run_agent
 from tools import registry
 from core.config import get_config, reload_config
+from core import keyring
 
 
 def interactive_mode(initial_model: str | None = None):
@@ -95,6 +96,12 @@ def interactive_mode(initial_model: str | None = None):
             reload_config()
             _show_model_menu(get_config())
             continue
+        if user_input == "/key":
+            _show_key_menu()
+            continue
+        if user_input.startswith("/key "):
+            _handle_key_command(user_input[5:].strip())
+            continue
 
         try:
             print("\n🤖 思考中...")
@@ -122,6 +129,10 @@ def _show_help():
     /tools       — 列出所有可用工具
     /model       — 列出并切换模型
     /model NAME  — 直接切换到指定模型（例如 /model deepseek）
+    /key         — 管理加密 Key 存储
+    /key set     — 加密保存 API Key（例如 /key set deepseek sk-xxx）
+    /key remove  — 删除指定模型的 Key
+    /key clear   — 清除所有 Key
     /reload      — 重新加载 config/models.json
     /reset       — 重置对话
     /debug       — 显示当前上下文
@@ -165,8 +176,116 @@ def _switch_model(cfg, name: str):
     # 检查 Key
     m = cfg.current_model
     if not m.api_key:
-        print(f"  ⚠️  模型 '{name}' 未设置 API Key！请在环境变量中配置。")
+        print(f"  ⚠️  模型 '{name}' 未设置 API Key！使用 /key set {name} sk-xxx 加密保存。")
     print()
+
+
+def _show_key_menu():
+    """显示 Key 管理界面"""
+    kr_keys = keyring.list_keys()
+    print("\n🔑 加密 Key 存储:")
+    print(f"  存储位置: {keyring.KEYRING_FILE}")
+    if kr_keys:
+        print(f"  已保存 ({len(kr_keys)}):")
+        for name in kr_keys:
+            print(f"    • {name}")
+        print()
+        print(f"  命令:")
+        print(f"    /key set <模型名> <API Key>   — 加密保存 Key")
+        print(f"    /key remove <模型名>          — 删除指定 Key")
+        print(f"    /key clear                    — 清除所有 Key")
+    else:
+        print(f"  📭 尚未保存任何 Key")
+        print()
+        print(f"  用法: /key set deepseek sk-xxxxxxxxxxxxxxxx")
+        print(f"  Key 会被加密存储在 ~/.mini-agent/keys.enc，仅当前机器可解密。")
+    print()
+
+
+def _handle_key_command(args: str):
+    """处理 /key 子命令"""
+    import json
+
+    parts = args.split(maxsplit=1)
+    if not parts:
+        _show_key_menu()
+        return
+
+    cmd = parts[0]
+
+    if cmd == "set" and len(parts) < 2:
+        print("❌ 用法: /key set <模型名> <API Key>")
+        print("   例如: /key set deepseek sk-xxxxxxxxxxxxxxxx")
+        return
+
+    if cmd == "set":
+        rest = parts[1].strip()
+        # 解析第一个空格分割：模型名 和 Key
+        space_idx = rest.find(" ")
+        if space_idx < 0:
+            print("❌ 用法: /key set <模型名> <API Key>")
+            print("   例如: /key set deepseek sk-xxxxxxxxxxxxxxxx")
+            return
+        model_name = rest[:space_idx].strip()
+        api_key = rest[space_idx + 1:].strip()
+
+        if not model_name or not api_key:
+            print("❌ 模型名和 Key 不能为空")
+            return
+
+        # 检查模型名是否在配置中
+        cfg = get_config()
+        if model_name not in cfg.models:
+            print(f"⚠️  模型 '{model_name}' 不在配置中，将存档但无法直接使用。")
+            yn = input(f"   确认保存? (y/N): ").strip().lower()
+            if yn != "y":
+                print("   已取消")
+                return
+
+        keyring.save_key(model_name, api_key)
+        # 重新加载配置，让新 Key 生效
+        reload_config()
+        print(f"✅ Key 已加密保存！模型 '{model_name}' 现在可用。")
+        print(f"   加密文件: {keyring.KEYRING_FILE} (仅当前机器可解密)")
+        return
+
+    if cmd == "remove" and len(parts) < 2:
+        print("❌ 用法: /key remove <模型名>")
+        print("   例如: /key remove deepseek")
+        return
+
+    if cmd == "remove":
+        model_name = parts[1].strip()
+        if keyring.delete_key(model_name):
+            reload_config()
+            print(f"✅ 已删除 '{model_name}' 的 Key")
+        else:
+            print(f"❌ 模型 '{model_name}' 没有保存的 Key")
+        return
+
+    if cmd == "clear":
+        kr_keys = keyring.list_keys()
+        if not kr_keys:
+            print("📭 Key 存储已经为空")
+            return
+        print(f"⚠️  将删除所有 Key ({', '.join(kr_keys)})")
+        yn = input("   确认? (y/N): ").strip().lower()
+        if yn != "y":
+            print("   已取消")
+            return
+        keyring.clear_keys()
+        reload_config()
+        print("✅ 所有 Key 已清除")
+        return
+
+    if cmd == "list":
+        _show_key_menu()
+        return
+
+    # 未知子命令
+    print(f"❌ 未知命令: /key {cmd}")
+    print("   可用: set, remove, clear, list")
+    print("   例如: /key set deepseek sk-xxxxxxxxxxxxxxxx")
 
 
 if __name__ == "__main__":

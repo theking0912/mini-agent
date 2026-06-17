@@ -1,7 +1,7 @@
 {
   "name": "Mini Agent",
   "image": "mcr.microsoft.com/devcontainers/python:3.13",
-  "postCreateCommand": "pip install httpx duckduckgo-search",
+  "postCreateCommand": "pip install httpx duckduckgo-search cryptography",
   "customizations": {
     "vscode": {
       "settings": {

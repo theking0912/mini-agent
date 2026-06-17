@@ -3,8 +3,9 @@
 ───────────────────────────────────────────────
 设计思路：
   - 所有模型配置集中在一个 JSON 文件（config/models.json）
-  - API Key 不写入文件，使用 ${ENV_VAR_NAME} 语法引用环境变量
-  - 运行时通过 env_var 插值解析实际的 Key
+  - API Key 按以下优先级查找：
+    1. 环境变量（${ENV_VAR_NAME} 语法引用）
+    2. 加密 Key 存储（core.keyring — 基于 machine code 解密）
   - 支持：运行时切换模型、列出可用模型、动态刷新配置
 
 配置文件格式：
@@ -12,7 +13,7 @@
         "default": "deepseek",
         "models": {
             "deepseek": {
-                "api_key": "${DEEPSEEK_API_KEY}",
+                "api_key": "${DEEPSEEK_API_KEY}",  # ← 环境变量引用
                 "base_url": "https://api.deepseek.com/v1",
                 "model": "deepseek-chat",
                 "description": "DeepSeek V3"
@@ -84,6 +85,34 @@ def _resolve_env(value: str) -> str:
     return _ENV_PATTERN.sub(_replacer, value)
 
 
+def _resolve_api_key(model_name: str, raw_value: str) -> str:
+    """
+    解析 API Key，优先级：
+    1. 环境变量（${VAR} 插值后非空）
+    2. 加密 Key 存储（core.keyring）
+    """
+    # 先试环境变量
+    env_val = _resolve_env(raw_value)
+    if env_val and not env_val.startswith("${"):
+        return env_val
+
+    # 再试加密 key 存储
+    try:
+        from .keyring import load_key
+        kr_val = load_key(model_name)
+        if kr_val:
+            return kr_val
+    except Exception:
+        pass
+
+    return ""
+
+
+def _has_api_key(model_name: str, raw_value: str) -> bool:
+    """检查某个模型是否有可用的 Key（不暴露具体值）"""
+    return bool(_resolve_api_key(model_name, raw_value))
+
+
 # ── 加载器 ────────────────────────────────────────────────────
 def load_config() -> AppConfig:
     """
@@ -115,7 +144,7 @@ def load_config() -> AppConfig:
 
         m = ModelConfig(
             name=name,
-            api_key=_resolve_env(api_key_raw),
+            api_key=_resolve_api_key(name, api_key_raw),
             base_url=_resolve_env(base_url_raw),
             model=_resolve_env(model_raw),
             description=cfg.get("description", name),
@@ -134,7 +163,7 @@ def load_config() -> AppConfig:
 def _create_default_config():
     """首次运行时创建默认配置模板"""
     default_content = """{
-  "//": "多模型配置文件。API Key 使用 ${ENV_VAR_NAME} 语法引用环境变量，不进文件。",
+  "//": "多模型配置文件。API Key 使用 ${ENV_VAR_NAME} 引用环境变量，或通过 /key 命令存入加密存储。",
   "default": "deepseek",
   "models": {
     "deepseek": {
@@ -143,11 +172,23 @@ def _create_default_config():
       "model": "deepseek-chat",
       "description": "DeepSeek V3 (性价比之选)"
     },
+    "deepseek-reasoner": {
+      "api_key": "${DEEPSEEK_API_KEY}",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-reasoner",
+      "description": "DeepSeek R1 (深度推理)"
+    },
     "gpt4o": {
       "api_key": "${OPENAI_API_KEY}",
       "base_url": "https://api.openai.com/v1",
       "model": "gpt-4o",
       "description": "OpenAI GPT-4o (通用最强)"
+    },
+    "gpt4o-mini": {
+      "api_key": "${OPENAI_API_KEY}",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "description": "OpenAI GPT-4o Mini (轻量快速)"
     }
   }
 }
