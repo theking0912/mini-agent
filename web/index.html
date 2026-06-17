@@ -474,7 +474,7 @@ document.getElementById('modelSelector').addEventListener('change', async functi
 
 // ── Keys ──
 async function loadKeys() {
-  const res = await fetch('/api/key/list');
+  const res = await fetch('/api/key/list', {headers: authHeaders({})});
   const data = await res.json();
   const savedKeys = new Set(data.keys || []);
   
@@ -512,7 +512,7 @@ async function saveKey() {
   if (!key) return alert('请输入 API Key');
   const res = await fetch('/api/key/set', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: authHeaders({'Content-Type': 'application/json'}),
     body: JSON.stringify({model, key})
   });
   const data = await res.json();
@@ -528,7 +528,7 @@ async function removeKey(model) {
   if (!confirm(`确定删除 ${model} 的 Key？`)) return;
   const res = await fetch('/api/key/remove', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: authHeaders({'Content-Type': 'application/json'}),
     body: JSON.stringify({model})
   });
   const data = await res.json();
