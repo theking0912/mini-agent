@@ -175,6 +175,21 @@
     max-width: 90%;
   }
 
+  .no-key-card {
+    align-self: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    max-width: 360px;
+    text-align: center;
+    animation: fadeIn .3s ease;
+  }
+  .no-key-icon { font-size: 36px; margin-bottom: 12px; }
+  .no-key-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .no-key-desc { font-size: 13px; color: var(--text2); margin-bottom: 18px; line-height: 1.5; }
+  .no-key-card .btn { font-size: 14px; padding: 10px 24px; }
+
   .typing {
     align-self: flex-start;
     display: flex;
@@ -631,8 +646,16 @@ async function send() {
             addToolMsg(calls);
           } else if (data.type === 'tool_result') {
             addToolMsg(`✅ ${data.name}: ${data.result.slice(0, 100)}`);
-          } else if (data.type === 'error') {
-            contentDiv.textContent += '\n' + data.content;
+          } else if (data.type === 'no_key') {
+            // 显示 Key 缺失引导卡片
+            contentDiv.className = 'no-key-card';
+            contentDiv.innerHTML = `
+              <div class="no-key-icon">🔑</div>
+              <div class="no-key-title">还没设置 API Key</div>
+              <div class="no-key-desc">当前模型「${data.model}」需要 API Key 才能对话</div>
+              <button class="btn btn-primary" onclick="openSettings()">⚙ 去设置 Key</button>
+            `;
+            scrollToBottom();
           } else if (data.type === 'done') {
             // done
           }

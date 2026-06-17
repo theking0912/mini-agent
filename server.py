@@ -167,7 +167,7 @@ async def _stream_chat(user_message: str, user_api_key: str | None = None) -> As
     # 检查 Key（优先用户 Key，其次全局 Key）
     api_key = user_api_key or cfg.current_model.api_key
     if not api_key:
-        yield f"data: {json.dumps({'type': 'error', 'content': f'❌ 模型 \"{model_name}\" 未设置 API Key，请在设置中配置'})}\n\n"
+        yield f"data: {json.dumps({'type': 'no_key', 'model': model_name})}\n\n"
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
         return
 
