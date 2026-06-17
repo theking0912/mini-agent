@@ -299,6 +299,26 @@
     letter-spacing: .5px;
   }
   #profileAvatar:hover #avatarHoverHint { display: block; }
+
+  /* ── Profile Tabs ── */
+  .profile-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    padding: 10px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .profile-tab:hover { color: var(--text); }
+  .profile-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+  .profile-tab-content { display: none; }
+  .profile-tab-content.active { display: block; }
   .settings-section label {
     display: block;
     font-size: 13px;
@@ -358,8 +378,8 @@
     <span id="modelStatus" style="font-size:12px;color:var(--text2)"></span>
     <select id="modelSelector" class="model-select"></select>
     <button class="btn btn-sm" onclick="resetChat()">↺</button>
-    <button class="btn btn-sm" onclick="openSettings()">⚙</button>
-    <button class="btn btn-sm" onclick="openProfile()" id="profileBtn" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--primary)">
+    <button class="btn btn-sm" onclick="openProfile('keys')">⚙</button>
+    <button class="btn btn-sm" onclick="openProfile('info')" id="profileBtn" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--primary)">
       <span id="headerAvatarFallback" style="font-size:14px;color:white;display:flex;align-items:center;justify-content:center;width:100%;height:100%">👤</span>
       <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('headerAvatarFallback').style.display='flex'">
     </button>
@@ -383,66 +403,63 @@
   <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
 </div>
 
-<!-- Settings -->
-<div class="settings-overlay" id="settingsOverlay">
-  <div class="settings-panel">
-    <h2>
-      ⚙ 设置
-      <button class="close-btn" onclick="closeSettings()">✕</button>
+<!-- Profile & Settings（统一弹窗，Tab 切换） -->
+<div class="settings-overlay" id="profileOverlay">
+  <div class="settings-panel" style="width:520px">
+    <h2 style="margin-bottom:0">
+      <span id="profilePanelTitle">👤 个人中心</span>
+      <button class="close-btn" onclick="closeProfile()">✕</button>
     </h2>
 
-    <div class="settings-section">
-      <h3>API Key 管理</h3>
-      <div id="keyList"></div>
-      <div style="margin-top:10px">
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;margin-top:16px">
+      <button class="profile-tab active" data-tab="info" onclick="switchProfileTab('info')">👤 个人信息</button>
+      <button class="profile-tab" data-tab="keys" onclick="switchProfileTab('keys')">🔑 API Key</button>
+    </div>
+
+    <!-- Tab: 个人信息 -->
+    <div id="profileTabInfo" class="profile-tab-content active">
+      <div class="settings-section">
+        <div style="text-align:center;padding:12px 0">
+          <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:32px;color:white;margin:0 auto 8px;overflow:hidden;position:relative;cursor:pointer" id="profileAvatar" onclick="document.getElementById('avatarInput').click()" title="点击更换头像">
+            <span id="profileAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">?</span>
+            <img id="profileAvatarImg" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('profileAvatarFallback').style.display='flex'">
+            <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:white;font-size:11px;padding:3px 0;display:none" id="avatarHoverHint">更换</div>
+          </div>
+          <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatar(this.files[0])">
+          <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);min-height:18px;margin-bottom:4px"></div>
+          <div style="font-size:15px;font-weight:600" id="profileName">—</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:4px" id="profileEmail">—</div>
+        </div>
+      </div>
+      <div class="settings-section">
+        <button class="btn" style="width:100%;text-align:left" onclick="resetChat()">↺ 重置对话</button>
+      </div>
+      <div class="settings-section">
+        <button class="btn" style="width:100%;color:var(--error);border-color:var(--error);text-align:center" onclick="logout()">🚪 退出登录</button>
+      </div>
+    </div>
+
+    <!-- Tab: API Key -->
+    <div id="profileTabKeys" class="profile-tab-content">
+      <div class="settings-section">
+        <h3>已保存的 Key</h3>
+        <div id="keyList"></div>
+      </div>
+      <div class="settings-section">
+        <h3>添加 / 更新 Key</h3>
         <label>模型</label>
         <select id="keyModelSelect" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;margin-bottom:8px;outline:none"></select>
         <label>API Key</label>
         <input type="password" id="keyInput" placeholder="sk-xxx...xxxx">
         <button class="btn btn-primary key-save-btn" onclick="saveKey()">保存 Key</button>
       </div>
-    </div>
-
-    <div class="settings-section">
-      <h3>关于</h3>
-      <p style="font-size:13px;color:var(--text2);line-height:1.6">
-        Mini Agent — 从零搭建的最小化 AI Agent 框架<br>
-        代码: <a href="https://github.com/theking0912/mini-agent" target="_blank" style="color:var(--primary)">github.com/theking0912/mini-agent</a>
-      </p>
-    </div>
-  </div>
-</div>
-
-<!-- Profile -->
-<div class="settings-overlay" id="profileOverlay">
-  <div class="settings-panel">
-    <h2>
-      👤 个人信息
-      <button class="close-btn" onclick="closeProfile()">✕</button>
-    </h2>
-
-    <div class="settings-section">
-      <div style="text-align:center;padding:12px 0">
-        <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:32px;color:white;margin:0 auto 8px;overflow:hidden;position:relative;cursor:pointer" id="profileAvatar" onclick="document.getElementById('avatarInput').click()" title="点击更换头像">
-          <span id="profileAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">?</span>
-          <img id="profileAvatarImg" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('profileAvatarFallback').style.display='flex'">
-          <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:white;font-size:11px;padding:3px 0;display:none" id="avatarHoverHint">更换</div>
-        </div>
-        <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatar(this.files[0])">
-        <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);min-height:18px;margin-bottom:4px"></div>
-        <div style="font-size:15px;font-weight:600" id="profileName">—</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:4px" id="profileEmail">—</div>
+      <div class="settings-section">
+        <h3>关于</h3>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6">
+          代码: <a href="https://github.com/theking0912/mini-agent" target="_blank" style="color:var(--primary)">github.com/theking0912/mini-agent</a>
+        </p>
       </div>
-    </div>
-
-    <div class="settings-section">
-      <h3>设置</h3>
-      <button class="btn" style="width:100%;text-align:left;margin-bottom:8px" onclick="closeProfile();openSettings()">⚙ API Key 管理</button>
-      <button class="btn" style="width:100%;text-align:left" onclick="resetChat()">↺ 重置对话</button>
-    </div>
-
-    <div class="settings-section">
-      <button class="btn" style="width:100%;color:var(--error);border-color:var(--error);text-align:center" onclick="logout()">🚪 退出登录</button>
     </div>
   </div>
 </div>
@@ -610,14 +627,29 @@ async function removeKey(model) {
   }
 }
 
-// ── Settings ──
-function openSettings() { 
-  document.getElementById('settingsOverlay').classList.add('open');
-  loadKeys(); 
+// ── Profile（统一弹窗，Tab 切换） ──
+function openProfile(tab) {
+  document.getElementById('profileOverlay').classList.add('open');
+  switchProfileTab(tab || 'info');
+  if (tab === 'info') loadProfileInfo();
+  if (tab === 'keys') loadKeys();
 }
-function closeSettings() { document.getElementById('settingsOverlay').classList.remove('open'); }
-document.getElementById('settingsOverlay').addEventListener('click', function(e) {
-  if (e.target === this) closeSettings();
+function switchProfileTab(tab) {
+  // 切换 Tab 按钮高亮
+  document.querySelectorAll('.profile-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  // 切换内容面板
+  document.getElementById('profileTabInfo').classList.toggle('active', tab === 'info');
+  document.getElementById('profileTabKeys').classList.toggle('active', tab === 'keys');
+  // 更新标题
+  const titles = { info: '👤 个人中心', keys: '🔑 API Key 管理' };
+  document.getElementById('profilePanelTitle').textContent = titles[tab] || '👤 个人中心';
+  if (tab === 'info') loadProfileInfo();
+  if (tab === 'keys') loadKeys();
+}
+document.getElementById('profileOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeProfile();
 });
 
 // ── Chat ──
@@ -708,7 +740,7 @@ async function send() {
               <div class="no-key-icon">🔑</div>
               <div class="no-key-title">还没设置 API Key</div>
               <div class="no-key-desc">当前模型「${data.model}」需要 API Key 才能对话</div>
-              <button class="btn btn-primary" onclick="openSettings()">⚙ 去设置 Key</button>
+              <button class="btn btn-primary" onclick="openProfile('keys')">⚙ 去设置 Key</button>
             `;
             scrollToBottom();
           } else if (data.type === 'error') {
@@ -717,7 +749,7 @@ async function send() {
               <div class="no-key-icon">⚠️</div>
               <div class="no-key-title">API Key 无效或已过期</div>
               <div class="no-key-desc">当前模型「${data.model || getCurrentModel()}」的 Key 无法连接到 API，请检查或重新设置</div>
-              <button class="btn btn-primary" onclick="openSettings()">⚙ 去重新设置</button>
+              <button class="btn btn-primary" onclick="openProfile('keys')">⚙ 去重新设置</button>
             `;
             scrollToBottom();
           } else if (data.type === 'done') {
@@ -809,8 +841,7 @@ function autoResize(textarea) {
 // ── Profile ──
 let currentUser = null;
 
-async function openProfile() {
-  document.getElementById('profileOverlay').classList.add('open');
+async function loadProfileInfo() {
   document.getElementById('avatarUploadStatus').textContent = '';
   try {
     const res = await fetch('/api/auth/me', {headers: {'Authorization': 'Bearer ' + TOKEN}});
@@ -855,22 +886,23 @@ async function uploadAvatar(file) {
       status.textContent = '❌ ' + data.error;
     } else {
       status.textContent = '✅ 头像已更新';
-      // 刷新头像显示
+      // 通过代理 URL 刷新头像（不用 MinIO 直连 URL，浏览器可能跨域/网络不可达）
+      const userId = currentUser?.id;
       const img = document.getElementById('profileAvatarImg');
       const fallback = document.getElementById('profileAvatarFallback');
       const name = document.getElementById('profileName').textContent;
       fallback.style.display = 'flex';
       fallback.textContent = name[0].toUpperCase();
       img.style.display = 'none';
-      img.src = data.url + '?t=' + Date.now();
+      img.src = (userId ? '/api/avatar/' + userId : data.url) + '?t=' + Date.now();
       img.onload = function() {
         fallback.style.display = 'none';
         img.style.display = 'block';
       };
-      // 同时更新用户栏头像
+      // 同时更新头部头像
       const avatarEl = document.getElementById('headerAvatar');
-      if (avatarEl) {
-        avatarEl.src = data.url + '?t=' + Date.now();
+      if (avatarEl && userId) {
+        avatarEl.src = '/api/avatar/' + userId + '?t=' + Date.now();
       }
       setTimeout(() => { status.textContent = ''; }, 3000);
     }
@@ -900,7 +932,6 @@ document.addEventListener('keydown', function(e) {
     if (document.activeElement === input) send();
   }
   if (e.key === 'Escape') {
-    closeSettings();
     closeProfile();
   }
 });
