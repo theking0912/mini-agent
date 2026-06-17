@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Agent</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #252535;
+    --border: #2e2e42;
+    --text: #e4e4ed;
+    --text2: #9090a8;
+    --primary: #6c5ce7;
+    --primary-dim: #4834d4;
+    --success: #00b894;
+    --warn: #fdcb6e;
+    --error: #e17055;
+    --radius: 10px;
+    --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header h1 span { color: var(--primary); }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ── Model Selector ── */
+  .model-select {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+  }
+  .model-select:focus { border-color: var(--primary); }
+  .model-select option { background: var(--surface); }
+
+  .key-indicator {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .key-indicator.ok { background: var(--success); }
+  .key-indicator.missing { background: var(--error); }
+
+  /* ── Buttons ── */
+  .btn {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn:hover { background: var(--border); }
+  .btn-primary { background: var(--primary); border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-dim); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* ── Chat Area ── */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  #chat::-webkit-scrollbar { width: 6px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .msg {
+    max-width: 80%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    line-height: 1.6;
+    font-size: 14px;
+    animation: fadeIn .2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .msg.user {
+    align-self: flex-end;
+    background: var(--primary);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .msg.assistant .label {
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .msg.assistant .label .model-tag {
+    color: var(--text2);
+    font-weight: 400;
+  }
+  .msg.assistant pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .msg.assistant code {
+    background: var(--bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .msg.assistant p { margin: 4px 0; }
+  .msg.assistant ul, .msg.assistant ol { margin: 4px 0; padding-left: 20px; }
+
+  .msg.tool-call {
+    align-self: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: var(--text2);
+    font-family: var(--mono);
+    animation: fadeIn .2s ease;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .msg.error {
+    align-self: center;
+    background: rgba(225, 112, 85, .15);
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--error);
+    max-width: 90%;
+  }
+
+  .typing {
+    align-self: flex-start;
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 4px;
+  }
+  .typing span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text2);
+    animation: bounce 1.2s infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: .2s; }
+  .typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+  /* ── Input ── */
+  .input-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .input-bar textarea {
+    flex: 1;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--font);
+    resize: none;
+    outline: none;
+    min-height: 42px;
+    max-height: 120px;
+    line-height: 1.5;
+  }
+  .input-bar textarea:focus { border-color: var(--primary); }
+  .input-bar textarea::placeholder { color: var(--text2); }
+  .input-bar .send-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 42px; height: 42px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  .input-bar .send-btn:hover { background: var(--primary-dim); }
+  .input-bar .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Settings Panel ── */
+  .settings-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+  .settings-overlay.open { display: flex; }
+  .settings-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 480px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 24px;
+  }
+  .settings-panel h2 {
+    font-size: 18px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .settings-panel h2 .close-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .settings-section {
+    margin-bottom: 20px;
+  }
+  .settings-section h3 {
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .settings-section label {
+    display: block;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+  .settings-section input[type="password"],
+  .settings-section input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    margin-bottom: 8px;
+  }
+  .settings-section input:focus { border-color: var(--primary); }
+  .settings-section .model-key-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .settings-section .model-key-item .name { font-size: 13px; }
+  .settings-section .model-key-item .status { font-size: 12px; }
+  .key-save-btn {
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text2);
+    gap: 8px;
+  }
+  .empty-state .icon { font-size: 48px; opacity: .3; }
+  .empty-state p { font-size: 14px; }
+  .empty-state .hint { font-size: 12px; color: var(--text2); opacity: .6; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1><span>✦</span> Mini Agent</h1>
+  <div class="header-actions">
+    <span id="modelStatus" style="font-size:12px;color:var(--text2)"></span>
+    <select id="modelSelector" class="model-select"></select>
+    <button class="btn btn-sm" onclick="resetChat()">↺</button>
+    <button class="btn btn-sm" onclick="openSettings()">⚙</button>
+  </div>
+</header>
+
+<!-- Chat -->
+<div id="chat">
+  <div class="empty-state" id="emptyState">
+    <div class="icon">✦</div>
+    <p>开始对话</p>
+    <p class="hint">在下方的输入框中输入消息</p>
+  </div>
+</div>
+
+<!-- Input -->
+<div class="input-bar">
+  <textarea id="input" rows="1" placeholder="输入消息..." 
+    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"
+    oninput="autoResize(this)"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
+</div>
+
+<!-- Settings -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <h2>
+      ⚙ 设置
+      <button class="close-btn" onclick="closeSettings()">✕</button>
+    </h2>
+
+    <div class="settings-section">
+      <h3>API Key 管理</h3>
+      <div id="keyList"></div>
+      <div style="margin-top:10px">
+        <label>模型</label>
+        <select id="keyModelSelect" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;margin-bottom:8px;outline:none"></select>
+        <label>API Key</label>
+        <input type="password" id="keyInput" placeholder="sk-xxx...xxxx">
+        <button class="btn btn-primary key-save-btn" onclick="saveKey()">保存 Key</button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>关于</h3>
+      <p style="font-size:13px;color:var(--text2);line-height:1.6">
+        Mini Agent — 从零搭建的最小化 AI Agent 框架<br>
+        代码: <a href="https://github.com/theking0912/mini-agent" target="_blank" style="color:var(--primary)">github.com/theking0912/mini-agent</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let isStreaming = false;
+let abortController = null;
+
+// ── Init ──
+async function init() {
+  await loadModels();
+  await loadKeys();
+}
+init();
+
+// ── Models ──
+async function loadModels() {
+  const res = await fetch('/api/models');
+  const data = await res.json();
+  const sel = document.getElementById('modelSelector');
+  const keyModelSel = document.getElementById('keyModelSelect');
+  sel.innerHTML = '';
+  keyModelSel.innerHTML = '';
+
+  data.models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = `${m.description}`;
+    if (m.current) opt.selected = true;
+    sel.appendChild(opt);
+
+    const opt2 = document.createElement('option');
+    opt2.value = m.name;
+    opt2.textContent = m.name;
+    keyModelSel.appendChild(opt2);
+  });
+
+  updateModelStatus(data);
+}
+
+function updateModelStatus(data) {
+  const current = data.models.find(m => m.name === data.current);
+  if (!current) return;
+  const el = document.getElementById('modelStatus');
+  const dot = current.has_key ? 
+    '<span style="color:var(--success)">●</span>' : 
+    '<span style="color:var(--error)">●</span>';
+  el.innerHTML = `${dot} ${current.description}`;
+}
+
+document.getElementById('modelSelector').addEventListener('change', async function() {
+  const res = await fetch('/api/switch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({model: this.value})
+  });
+  const data = await res.json();
+  if (data.message) addToolMsg(data.message);
+  await loadModels();
+});
+
+// ── Keys ──
+async function loadKeys() {
+  const res = await fetch('/api/key/list');
+  const data = await res.json();
+  const el = document.getElementById('keyList');
+  if (data.keys && data.keys.length > 0) {
+    el.innerHTML = data.keys.map(k => 
+      `<div class="model-key-item">
+        <span class="name">${k}</span>
+        <span class="status" style="color:var(--success)">● 已配置</span>
+      </div>`
+    ).join('');
+  } else {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text2)">尚未保存任何 Key</p>';
+  }
+}
+
+async function saveKey() {
+  const model = document.getElementById('keyModelSelect').value;
+  const key = document.getElementById('keyInput').value.trim();
+  if (!key) return alert('请输入 API Key');
+  const res = await fetch('/api/key/set', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({model, key})
+  });
+  const data = await res.json();
+  if (data.message) {
+    document.getElementById('keyInput').value = '';
+    await loadKeys();
+    await loadModels();
+    addToolMsg(data.message);
+  }
+}
+
+// ── Settings ──
+function openSettings() { 
+  document.getElementById('settingsOverlay').classList.add('open');
+  loadKeys(); 
+}
+function closeSettings() { document.getElementById('settingsOverlay').classList.remove('open'); }
+document.getElementById('settingsOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ── Chat ──
+async function send() {
+  const input = document.getElementById('input');
+  const msg = input.value.trim();
+  if (!msg || isStreaming) return;
+
+  input.value = '';
+  autoResize(input);
+  hideEmptyState();
+
+  // Add user message
+  addMsg(msg, 'user');
+
+  // Show typing indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'typing';
+  typingEl.id = 'typing';
+  typingEl.innerHTML = '<span></span><span></span><span></span>';
+  document.getElementById('chat').appendChild(typingEl);
+  scrollToBottom();
+
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+  abortController = new AbortController();
+
+  // Create assistant message container
+  const assistantDiv = document.createElement('div');
+  assistantDiv.className = 'msg assistant';
+  assistantDiv.id = 'assistantMsg';
+  
+  const modelName = document.getElementById('modelSelector').selectedOptions[0]?.textContent || '';
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.innerHTML = `✦ <span class="model-tag">${modelName}</span>`;
+  assistantDiv.appendChild(label);
+  
+  const contentDiv = document.createElement('div');
+  contentDiv.id = 'assistantContent';
+  assistantDiv.appendChild(contentDiv);
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg}),
+      signal: abortController.signal
+    });
+
+    // Remove typing indicator
+    const typing = document.getElementById('typing');
+    if (typing) typing.remove();
+
+    document.getElementById('chat').appendChild(assistantDiv);
+    scrollToBottom();
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          
+          if (data.type === 'token') {
+            contentDiv.textContent += data.content;
+            scrollToBottom();
+          } else if (data.type === 'tool_call') {
+            const calls = data.tool_calls.map(tc => 
+              `🔧 ${tc.name}(${JSON.stringify(tc.arguments)})`
+            ).join(', ');
+            addToolMsg(calls);
+          } else if (data.type === 'tool_result') {
+            addToolMsg(`✅ ${data.name}: ${data.result.slice(0, 100)}`);
+          } else if (data.type === 'error') {
+            contentDiv.textContent += '\n' + data.content;
+          } else if (data.type === 'done') {
+            // done
+          }
+        } catch(e) {
+          // skip parse errors
+        }
+      }
+    }
+  } catch(e) {
+    const typing = document.getElementById('typing');
+    if (typing) typing.remove();
+    if (e.name !== 'AbortError') {
+      addToolMsg('❌ ' + e.message, 'error');
+    }
+  }
+
+  isStreaming = false;
+  document.getElementById('sendBtn').disabled = false;
+  scrollToBottom();
+}
+
+function addMsg(text, role) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  if (role === 'user') {
+    div.textContent = text;
+  } else {
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = '✦';
+    div.appendChild(label);
+    const content = document.createElement('div');
+    content.textContent = text;
+    div.appendChild(content);
+  }
+  chat.appendChild(div);
+  scrollToBottom();
+}
+
+function addToolMsg(text, type) {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = type === 'error' ? 'msg error' : 'msg tool-call';
+  div.textContent = text;
+  chat.appendChild(div);
+  scrollToBottom();
+}
+
+async function resetChat() {
+  if (isStreaming && abortController) {
+    abortController.abort();
+    isStreaming = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+  const res = await fetch('/api/reset', {method: 'POST'});
+  const data = await res.json();
+  document.getElementById('chat').innerHTML = '';
+  showEmptyState();
+  addToolMsg(data.message);
+}
+
+function hideEmptyState() {
+  const el = document.getElementById('emptyState');
+  if (el) el.style.display = 'none';
+}
+function showEmptyState() {
+  const el = document.getElementById('emptyState');
+  if (el) el.style.display = 'flex';
+}
+
+function scrollToBottom() {
+  const chat = document.getElementById('chat');
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function autoResize(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+}
+
+// Keyboard shortcut: Ctrl+Enter also sends
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    const input = document.getElementById('input');
+    if (document.activeElement === input) send();
+  }
+  if (e.key === 'Escape') closeSettings();
+});
+</script>
+</body>
+</html>
