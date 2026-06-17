@@ -327,7 +327,7 @@ flowchart TB
     
     subgraph 头像流程
         API -->|/api/avatar/upload| MI
-        API -->|/api/avatar/{id}| MI
+        API -->|/api/avatar/:id| MI
         API -->|记录路径| USER
         USER --> PG
     end
