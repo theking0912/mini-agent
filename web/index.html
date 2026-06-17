@@ -27,9 +27,11 @@
     background: var(--bg);
     color: var(--text);
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   /* ── Header ── */
@@ -253,6 +255,24 @@
   .input-bar .send-btn:hover { background: var(--primary-dim); }
   .input-bar .send-btn:disabled { opacity: .4; cursor: not-allowed; }
 
+  /* ── Mobile Responsive ── */
+  @media (max-width: 520px) {
+    header { padding: 8px 10px; }
+    header h1 { font-size: 14px; }
+    .header-actions { gap: 4px; }
+    #modelStatus { display: none; }
+    .btn-sm { padding: 3px 7px; font-size: 11px; }
+    #modelSelector { max-width: 120px; font-size: 12px; padding: 4px 8px; }
+    .input-bar { padding: 8px 10px; }
+    .input-bar textarea { font-size: 16px; } /* 防 iOS 缩放 */
+    #chat { padding: 12px 10px; }
+    .msg { max-width: 90%; padding: 10px 12px; font-size: 14px; }
+  }
+  @media (max-width: 380px) {
+    header h1 { font-size: 13px; }
+    #modelSelector { max-width: 90px; }
+  }
+
   /* ── Settings Panel ── */
   .settings-overlay {
     display: none;
@@ -428,7 +448,7 @@
             <img id="profileAvatarImg" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('profileAvatarFallback').style.display='flex'">
             <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:white;font-size:11px;padding:3px 0;display:none" id="avatarHoverHint">更换</div>
           </div>
-          <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatar(this.files[0])">
+          <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" capture="environment" style="display:none" onchange="uploadAvatar(this.files[0])">
           <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);min-height:18px;margin-bottom:4px"></div>
           <div style="font-size:15px;font-weight:600" id="profileName">—</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="profileEmail">—</div>
@@ -468,6 +488,16 @@
 </div>
 
 <script>
+// ── 动态视口高度（解决移动端地址栏/键盘弹起） ──
+function fixViewport() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+  document.body.style.height = 'calc(var(--vh, 1vh) * 100)';
+}
+fixViewport();
+window.addEventListener('resize', fixViewport);
+window.addEventListener('orientationchange', function() { setTimeout(fixViewport, 200); });
+
 // ── Auth check ──
 const TOKEN = localStorage.getItem('mini_agent_token');
 if (!TOKEN) {

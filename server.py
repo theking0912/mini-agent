@@ -362,6 +362,11 @@ async def upload_avatar(request: Request):
 
     # 解析 multipart form（不用 cgi，Python 3.13 已移除）
     body = await request.body()
+
+    # 最大 10MB
+    MAX_SIZE = 10 * 1024 * 1024
+    if len(body) > MAX_SIZE:
+        return JSONResponse({"error": "文件太大，最大支持 10MB"}, status_code=400)
     content_type = request.headers.get("content-type", "")
 
     # 只支持常见图片格式
