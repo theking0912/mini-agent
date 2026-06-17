@@ -9,6 +9,7 @@ import psycopg2
 import psycopg2.extras
 
 from core.db import get_conn_sync
+from core import keyring
 
 
 # ── 密码处理 ──────────────────────────────────────────────────
@@ -156,15 +157,22 @@ def logout_user(user_id: int) -> bool:
         conn.close()
 
 
-# ── API Key 管理（每个用户独立）──────────────────────────────────
+# ── API Key 管理（每个用户独立，加密存储）────────────────────────
 def get_user_keys(user_id: int) -> dict:
+    """获取用户所有模型 Key，密文字段自动解密（兼容旧版明文）"""
     conn = get_conn_sync()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cur.execute("SELECT api_keys FROM users WHERE id = %s", (user_id,))
         row = cur.fetchone()
         if row and row.get("api_keys"):
-            return dict(row["api_keys"])
+            raw = dict(row["api_keys"])
+            # 解密每个 Key，失败则视为明文（旧数据兼容）
+            decrypted = {}
+            for model_name, val in raw.items():
+                plain = keyring.decrypt_value(val)
+                decrypted[model_name] = plain if plain is not None else val
+            return decrypted
         return {}
     finally:
         cur.close()
@@ -172,14 +180,16 @@ def get_user_keys(user_id: int) -> dict:
 
 
 def set_user_key(user_id: int, model_name: str, api_key: str):
+    """加密保存用户 API Key 到 PostgreSQL"""
     import json
+    encrypted = keyring.encrypt_value(api_key)
     conn = get_conn_sync()
     conn.autocommit = True
     cur = conn.cursor()
     try:
         cur.execute(
             "UPDATE users SET api_keys = jsonb_set(COALESCE(api_keys, '{}'::jsonb), %s, %s::jsonb) WHERE id = %s",
-            (f"{{{model_name}}}", json.dumps(api_key), user_id)
+            (f"{{{model_name}}}", json.dumps(encrypted), user_id)
         )
     finally:
         cur.close()

@@ -122,6 +122,23 @@ def save_key(model_name: str, api_key: str):
     KEYRING_FILE.chmod(0o600)
 
 
+# ── 通用加密 / 解密（供 user.py 等模块复用）────────────────────
+def encrypt_value(plaintext: str) -> str:
+    """用机器绑定的 Fernet 密钥加密一段文本，返回 base64 密文字符串"""
+    KEYRING_DIR.mkdir(parents=True, exist_ok=True)
+    f = _get_fernet()
+    return f.encrypt(plaintext.encode()).decode()
+
+
+def decrypt_value(ciphertext: str) -> str | None:
+    """解密上述密文，失败返回 None（跨机器 / key 损坏）"""
+    try:
+        f = _get_fernet()
+        return f.decrypt(ciphertext.encode()).decode()
+    except Exception:
+        return None
+
+
 def load_key(model_name: str) -> str | None:
     """
     解密获取指定模型的 API Key
