@@ -1,0 +1,23 @@
+{
+  "//": "基础设施配置 — PG / Redis / SMTP。和环境变量脱钩。",
+  "postgresql": {
+    "host": "172.17.0.1",
+    "port": 5433,
+    "user": "leroy",
+    "password": "LeroyLee",
+    "database": "mini_agent"
+  },
+  "redis": {
+    "host": "172.17.0.4",
+    "port": 6379,
+    "password": "LeroyLee",
+    "db": 0
+  },
+  "email": {
+    "host": "smtp.qq.com",
+    "port": 465,
+    "user": "theking0912@qq.com",
+    "password": "dipbwabuswufbhcj",
+    "from_addr": "theking0912@qq.com"
+  }
+}

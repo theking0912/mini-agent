@@ -32,22 +32,29 @@ import uvicorn
 from core.config import get_config, reload_config
 from core.context import Context
 from core.tool_runner import run_agent
-from core import keyring
-from tools import registry
-
-# 用户注册
-from core import database as db
+from core import keyring, database as db
 from core import email as email_svc
+from tools import registry
 import redis as redis_module
 
-# Redis 连接
-redis_client = redis_module.Redis(
-    host=os.environ.get("REDIS_HOST", "172.18.0.1"),
-    port=int(os.environ.get("REDIS_PORT", "6379")),
-    db=0,
-    password=os.environ.get("REDIS_PASSWORD", "LeroyLee"),
-    decode_responses=False,
-)
+# Redis 连接（从 config/db.json 加载）
+import json as _json
+from pathlib import Path as _Path
+_DB_CFG_PATH = _Path(__file__).resolve().parent / "config" / "db.json"
+try:
+    with open(_DB_CFG_PATH, encoding="utf-8") as _f:
+        _redis_cfg = _json.load(_f)["redis"]
+    redis_client = redis_module.Redis(
+        host=_redis_cfg["host"],
+        port=_redis_cfg["port"],
+        db=_redis_cfg.get("db", 0),
+        password=_redis_cfg.get("password", None) or None,
+        decode_responses=False,
+    )
+    print(f"[Redis] {_redis_cfg['host']}:{_redis_cfg['port']} (from config/db.json)")
+except Exception as _e:
+    print(f"[Redis] 配置加载失败: {_e}")
+    redis_client = None
 
 # ── 应用 ──────────────────────────────────────────────────────
 app = FastAPI(title="Mini Agent Web UI")
@@ -405,6 +412,43 @@ async def auth_me(request: Request):
     if not user:
         return JSONResponse({"error": "登录已过期"}, status_code=401)
     return {"user": user}
+
+
+# ── 通知 API ──────────────────────────────────────────────────
+@app.post("/api/notify/test")
+async def notify_test(request: Request):
+    """发送测试通知邮件到当前用户的邮箱"""
+    user = _get_user(request)
+    if not user:
+        return JSONResponse({"error": "请先登录"}, status_code=401)
+    if not email_svc.is_configured():
+        return JSONResponse({"error": "SMTP 未配置，请在环境变量中设置 EMAIL_PASSWORD"}, status_code=400)
+    ok = await email_svc.send_notification(
+        to_addr=user["email"],
+        title="✅ Mini Agent 邮件通知测试",
+        message="<p>这是一封来自 Mini Agent 的测试邮件。</p><p>如果收到此邮件，说明邮件通知功能已正常工作 🎉</p>",
+    )
+    if ok:
+        return {"message": f"✅ 测试邮件已发送到 {user['email']}"}
+    return JSONResponse({"error": "发送失败，请检查 SMTP 配置"}, status_code=500)
+
+
+@app.post("/api/notify/send")
+async def notify_send(request: Request):
+    """发送自定义通知（仅管理员可用）"""
+    user = _get_user(request)
+    if not user or user.get("email") != "admin@mini.com":
+        return JSONResponse({"error": "仅管理员可用"}, status_code=403)
+    data = await request.json()
+    to_addr = data.get("to", user["email"])
+    title = data.get("title", "Mini Agent 通知")
+    message = data.get("message", "")
+    action_text = data.get("action_text", "")
+    action_url = data.get("action_url", "")
+    ok = await email_svc.send_notification(to_addr, title, message, action_text, action_url)
+    if ok:
+        return {"message": f"✅ 通知已发送到 {to_addr}"}
+    return JSONResponse({"error": "发送失败"}, status_code=500)
 
 
 # ── 启动 ──────────────────────────────────────────────────────

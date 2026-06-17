@@ -443,7 +443,7 @@ init();
 
 // ── Models ──
 async function loadModels() {
-  const res = await fetch('/api/models');
+  const res = await fetch('/api/models', {headers: authHeaders({})});
   const data = await res.json();
   const sel = document.getElementById('modelSelector');
   const keyModelSel = document.getElementById('keyModelSelect');

@@ -1,14 +1,13 @@
 """
 PostgreSQL 数据库模块 — 用户注册/登录/验证码存储
 ================================================
-依赖环境变量（或 keyring）：
-    PG_HOST=172.18.0.1  PG_PORT=5433  PG_USER=leroy
-    PG_PASSWORD=LeroyLee  PG_DATABASE=mini_agent
+配置来源：config/db.json（和环境变量完全脱钩）
 """
 
-import os
+import json
 import hashlib
 import secrets
+from pathlib import Path
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
@@ -16,12 +15,22 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.pool
 
-# ── 数据库配置 ──────────────────────────────────────────────────
-PG_HOST = os.environ.get("PG_HOST", "172.18.0.1")
-PG_PORT = int(os.environ.get("PG_PORT", "5433"))
-PG_USER = os.environ.get("PG_USER", "leroy")
-PG_PASSWORD = os.environ.get("PG_PASSWORD", "LeroyLee")
-PG_DATABASE = os.environ.get("PG_DATABASE", "mini_agent")
+# ── 数据库配置（从 config/db.json 加载）─────────────────────────
+_DB_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "db.json"
+try:
+    with open(_DB_CONFIG_PATH, encoding="utf-8") as _f:
+        _db_cfg = json.load(_f)["postgresql"]
+except Exception as _e:
+    raise RuntimeError(f"无法加载 {_DB_CONFIG_PATH}: {_e}")
+
+PG_HOST = _db_cfg["host"]
+PG_PORT = _db_cfg["port"]
+PG_USER = _db_cfg["user"]
+PG_PASSWORD = _db_cfg["password"]
+PG_DATABASE = _db_cfg["database"]
+
+print(f"[DB] 配置来源: {_DB_CONFIG_PATH}")
+print(f"[DB] PG_HOST={PG_HOST} PG_PORT={PG_PORT} PG_USER={PG_USER} PG_DATABASE={PG_DATABASE}")
 
 _pool = None
 
