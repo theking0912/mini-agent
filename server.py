@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Response
 import uvicorn
 
 # Mini Agent 核心
@@ -250,6 +250,30 @@ async def auth_logout(request: Request):
     if u:
         user.logout_user(u["id"])
     return {"message": "已退出登录"}
+
+
+# ── 头像 ──────────────────────────────────────────────────────
+import urllib.request as _urllib
+
+@app.get("/api/avatar/{user_id}")
+async def get_avatar(user_id: int):
+    """从 MinIO 获取用户头像"""
+    # 暂用默认 SVG 头像
+    avatar_url = "http://172.18.0.1:9000/avatars/default.svg"
+    try:
+        req = _urllib.Request(avatar_url)
+        req.add_header("User-Agent", "MiniAgent/1.0")
+        with _urllib.urlopen(req, timeout=5) as resp:
+            data = resp.read()
+        return Response(content=data, media_type="image/svg+xml")
+    except Exception:
+        # 回退：生成内联 SVG
+        name = f"U{user_id}"
+        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="100" fill="#6c5ce7"/>
+  <text x="100" y="130" font-size="80" font-family="sans-serif" fill="white" text-anchor="middle" font-weight="600">{name[0].upper()}</text>
+</svg>'''
+        return Response(content=svg.encode(), media_type="image/svg+xml")
 
 
 # ── 聊天 API ──────────────────────────────────────────────────

@@ -792,7 +792,7 @@ async function openProfile() {
       currentUser = data.user;
       const email = data.user.email || '';
       const name = data.user.display_name || email.split('@')[0];
-      document.getElementById('profileAvatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('profileAvatar').innerHTML = `<img src="/api/avatar/${data.user.id}" style="width:56px;height:56px;border-radius:50%;display:block">`;
       document.getElementById('profileName').textContent = name;
       document.getElementById('profileEmail').textContent = email;
     }
