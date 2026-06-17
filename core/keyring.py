@@ -20,40 +20,65 @@ import base64
 from pathlib import Path
 
 # ── 存储路径 ──────────────────────────────────────────────────
-# 保存在 ~/.mini-agent/keys.enc，离项目代码远一点，防止误提交
-KEYRING_DIR = Path.home() / ".mini-agent"
+# 可通过 MINI_AGENT_DATA_DIR 环境变量覆盖（Docker volume 挂载用）
+_data_dir = os.environ.get("MINI_AGENT_DATA_DIR")
+if _data_dir:
+    KEYRING_DIR = Path(_data_dir)
+else:
+    KEYRING_DIR = Path.home() / ".mini-agent"
 KEYRING_FILE = KEYRING_DIR / "keys.enc"
 
 
 # ── Machine Code ──────────────────────────────────────────────
+SALT_FILE = KEYRING_DIR / "salt"
+
+
 def get_machine_code() -> str:
     """
-    生成机器码：/etc/machine-id + hostname 的 SHA256 哈希
+    生成机器码用于派生加密密钥
     
-    为什么这样设计：
-    - machine-id 是 Linux 系统安装时生成的一次性 ID，稳定不变
-    - hostname 作为辅助，防止容器里 machine-id 重复
-    - 哈希后不会暴露原始 machine-id
+    策略（按优先级）：
+    1. 持久化 salt 文件（KEYRING_DIR/salt）—— Docker 友好，跨容器重启
+    2. /etc/machine-id + hostname —— 裸机 Linux
+    3. hostid + hostname —— 传统 fallback（自动生成 salt 保持跨重启）
     """
+    # 优先使用持久化 salt（在 KEYRING_DIR 中，随 volume 保留）
+    salt_path = KEYRING_DIR / "salt"
+    if salt_path.exists():
+        salt = salt_path.read_text().strip()
+        hostname = os.uname().nodename
+        raw = f"{salt}:{hostname}"
+        result = hashlib.sha256(raw.encode()).hexdigest()
+        # 确保 salt 文件和 key 文件在同一个路径下
+        KEYRING_DIR.mkdir(parents=True, exist_ok=True)
+        return result
+
     machine_id = ""
     try:
         machine_id = Path("/etc/machine-id").read_text().strip()
     except (FileNotFoundError, PermissionError, OSError):
         pass
 
-    # fallback：使用 hostid（也是系统级唯一值）
-    if not machine_id:
-        try:
-            import subprocess
-            result = subprocess.run(["hostid"], capture_output=True, text=True, timeout=3)
-            if result.returncode == 0:
-                machine_id = result.stdout.strip()
-        except Exception:
-            pass
-
     hostname = os.uname().nodename
+
+    # 没有 /etc/machine-id → Docker 或容器环境 → 用随机 salt 取代
+    if not machine_id:
+        salt = _ensure_salt()
+        raw = f"{salt}:{hostname}"
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    # 裸机 Linux：用 machine-id + hostname
     raw = f"{machine_id}:{hostname}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _ensure_salt():
+    """生成持久化 salt 写入 KEYRING_DIR/salt"""
+    KEYRING_DIR.mkdir(parents=True, exist_ok=True)
+    salt = hashlib.sha256(os.urandom(32)).hexdigest()
+    SALT_FILE.write_text(salt)
+    SALT_FILE.chmod(0o600)
+    return salt
 
 
 # ── 密钥派生 ──────────────────────────────────────────────────

@@ -455,16 +455,33 @@ document.getElementById('modelSelector').addEventListener('change', async functi
 async function loadKeys() {
   const res = await fetch('/api/key/list');
   const data = await res.json();
+  const savedKeys = new Set(data.keys || []);
+  
+  // 更新 Key 列表展示
   const el = document.getElementById('keyList');
-  if (data.keys && data.keys.length > 0) {
-    el.innerHTML = data.keys.map(k => 
-      `<div class="model-key-item">
-        <span class="name">${k}</span>
-        <span class="status" style="color:var(--success)">● 已配置</span>
-      </div>`
-    ).join('');
+  if (savedKeys.size > 0) {
+    el.innerHTML = '';
+    for (const k of savedKeys) {
+      const div = document.createElement('div');
+      div.className = 'model-key-item';
+      div.innerHTML = `
+        <span class="name">${k} <span style="color:var(--success);font-size:12px">● 已配置</span></span>
+        <button class="btn btn-sm" style="color:var(--error);border-color:var(--error)" onclick="removeKey('${k}')">✕ 删除</button>
+      `;
+      el.appendChild(div);
+    }
   } else {
     el.innerHTML = '<p style="font-size:13px;color:var(--text2)">尚未保存任何 Key</p>';
+  }
+
+  // 更新下拉框，标记哪些模型已有 Key
+  const sel = document.getElementById('keyModelSelect');
+  for (const opt of sel.options) {
+    if (savedKeys.has(opt.value)) {
+      opt.textContent = opt.value + ' ●';
+    } else {
+      opt.textContent = opt.value + ' ○';
+    }
   }
 }
 
@@ -480,6 +497,21 @@ async function saveKey() {
   const data = await res.json();
   if (data.message) {
     document.getElementById('keyInput').value = '';
+    await loadKeys();
+    await loadModels();
+    addToolMsg(data.message);
+  }
+}
+
+async function removeKey(model) {
+  if (!confirm(`确定删除 ${model} 的 Key？`)) return;
+  const res = await fetch('/api/key/remove', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({model})
+  });
+  const data = await res.json();
+  if (data.message) {
     await loadKeys();
     await loadModels();
     addToolMsg(data.message);
