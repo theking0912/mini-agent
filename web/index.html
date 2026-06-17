@@ -394,12 +394,33 @@
 </div>
 
 <script>
+// ── Auth check ──
+const TOKEN = localStorage.getItem('mini_agent_token');
+if (!TOKEN) {
+  window.location.href = '/auth';
+}
+
+function authHeaders(extra) {
+  return {...extra, 'Authorization': 'Bearer ' + TOKEN};
+}
+
 // ── State ──
 let isStreaming = false;
 let abortController = null;
 
 // ── Init ──
 async function init() {
+  // 验证 token 是否有效
+  try {
+    const res = await fetch('/api/auth/me', {headers: {'Authorization': 'Bearer ' + TOKEN}});
+    const data = await res.json();
+    if (!data.user) {
+      localStorage.removeItem('mini_agent_token');
+      window.location.href = '/auth';
+    }
+  } catch {
+    window.location.href = '/auth';
+  }
   await loadModels();
   await loadKeys();
 }
@@ -443,7 +464,7 @@ function updateModelStatus(data) {
 document.getElementById('modelSelector').addEventListener('change', async function() {
   const res = await fetch('/api/switch', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: authHeaders({'Content-Type': 'application/json'}),
     body: JSON.stringify({model: this.value})
   });
   const data = await res.json();
@@ -571,7 +592,7 @@ async function send() {
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders({'Content-Type': 'application/json'}),
       body: JSON.stringify({message: msg}),
       signal: abortController.signal
     });
@@ -667,7 +688,7 @@ async function resetChat() {
     isStreaming = false;
     document.getElementById('sendBtn').disabled = false;
   }
-  const res = await fetch('/api/reset', {method: 'POST'});
+  const res = await fetch('/api/reset', {method: 'POST', headers: authHeaders()});
   const data = await res.json();
   document.getElementById('chat').innerHTML = '';
   showEmptyState();

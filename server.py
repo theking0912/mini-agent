@@ -121,11 +121,16 @@ async def switch_model(request: Request):
 # ── 聊天 API（SSE 流式） ──────────────────────────────────────
 @app.post("/api/chat")
 async def chat(request: Request):
-    """SSE 流式聊天"""
+    """SSE 流式聊天（需登录）"""
     data = await request.json()
     user_message = data.get("message", "").strip()
     if not user_message:
         return JSONResponse({"error": "消息不能为空"}, status_code=400)
+
+    # 验证登录
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token or not db.get_user_by_token(token):
+        return JSONResponse({"error": "请先登录"}, status_code=401)
 
     return StreamingResponse(
         _stream_chat(user_message),
