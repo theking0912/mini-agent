@@ -473,7 +473,12 @@ function updateModelStatus(data) {
   const dot = current.has_key ? 
     '<span style="color:var(--success)">●</span>' : 
     '<span style="color:var(--error)">●</span>';
-  el.innerHTML = `${dot} ${current.description}`;
+  const total = data.models.length;
+  const configured = data.models.filter(m => m.has_key).length;
+  const summary = configured > 0 ? 
+    `<span style="color:var(--text2);font-size:11px;margin-left:8px">🔑 ${configured}/${total}</span>` : 
+    `<span style="color:var(--error);font-size:11px;margin-left:8px">🔑 未配置</span>`;
+  el.innerHTML = `${dot} ${current.description}${summary}`;
 }
 
 document.getElementById('modelSelector').addEventListener('change', async function() {
@@ -491,32 +496,32 @@ document.getElementById('modelSelector').addEventListener('change', async functi
 async function loadKeys() {
   const res = await fetch('/api/key/list', {headers: authHeaders({})});
   const data = await res.json();
-  const savedKeys = new Set(data.keys || []);
+  const models = data.keys || [];
+  const currentModel = data.current || '';
   
-  // 更新 Key 列表展示
+  // 更新 Key 列表展示（含真实状态 + 当前模型标记）
   const el = document.getElementById('keyList');
-  if (savedKeys.size > 0) {
-    el.innerHTML = '';
-    for (const k of savedKeys) {
-      const div = document.createElement('div');
-      div.className = 'model-key-item';
-      div.innerHTML = `
-        <span class="name">${k} <span style="color:var(--success);font-size:12px">● 已配置</span></span>
-        <button class="btn btn-sm" style="color:var(--error);border-color:var(--error)" onclick="removeKey('${k}')">✕ 删除</button>
-      `;
-      el.appendChild(div);
-    }
-  } else {
-    el.innerHTML = '<p style="font-size:13px;color:var(--text2)">尚未保存任何 Key</p>';
+  el.innerHTML = '';
+  for (const m of models) {
+    const dot = m.has_key ? '<span style="color:var(--success)">●</span>' : '<span style="color:var(--error)">●</span>';
+    const status = m.has_key ? '已配置' : '未配置';
+    const active = m.name === currentModel ? ' <span style="color:var(--primary);font-size:11px">← 当前</span>' : '';
+    const div = document.createElement('div');
+    div.className = 'model-key-item';
+    div.innerHTML = `
+      <span class="name">${dot} ${m.name}${active} <span style="font-size:12px;color:var(--text2)">${status}</span></span>
+    `;
+    el.appendChild(div);
   }
 
-  // 更新下拉框，标记哪些模型已有 Key
+  // 更新下拉框，标记哪些模型已有 Key 并显示当前模型
   const sel = document.getElementById('keyModelSelect');
   for (const opt of sel.options) {
-    if (savedKeys.has(opt.value)) {
-      opt.textContent = opt.value + ' ●';
-    } else {
-      opt.textContent = opt.value + ' ○';
+    const m = models.find(x => x.name === opt.value);
+    if (m) {
+      const dot = m.has_key ? '●' : '○';
+      const cur = m.name === currentModel ? ' ★' : '';
+      opt.textContent = m.name + ' ' + dot + cur;
     }
   }
 }

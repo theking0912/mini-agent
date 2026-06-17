@@ -274,12 +274,22 @@ async def key_remove(request: Request):
 
 @app.get("/api/key/list")
 async def key_list(request: Request):
-    """列出当前用户的 Key"""
+    """列出当前用户的 Key 状态（含当前模型信息）"""
     user = _get_user(request)
     if not user:
         return JSONResponse({"error": "请先登录"}, status_code=401)
-    keys = db.list_user_keys(user["id"])
-    return {"keys": keys}
+    cfg = get_config()
+    user_keys = db.get_user_keys(user["id"])
+    models = []
+    for name, m in cfg.models.items():
+        has_key = name in user_keys
+        models.append({
+            "name": name,
+            "description": m.description,
+            "has_key": has_key,
+            "current": name == cfg.current_model.name,
+        })
+    return {"keys": models, "current": cfg.current_model.name}
 
 
 # ── 对话管理 ──────────────────────────────────────────────────
