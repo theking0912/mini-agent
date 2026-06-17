@@ -236,7 +236,7 @@ async def _stream_chat(user_message: str, user_api_key: str | None = None) -> As
             yield f"data: {json.dumps({'type': 'token', 'content': final_reply})}\n\n"
 
     except Exception as e:
-        yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\n\n"
+        yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}', 'model': cfg.current_model.name})}\n\n"
 
     yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
