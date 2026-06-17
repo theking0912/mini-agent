@@ -93,7 +93,7 @@ async def send_verification_code(email: str, code: str, purpose: str = "register
         <div style="font-size:32px;letter-spacing:8px;text-align:center;
                     padding:16px;margin:16px 0;background:#f0f0f0;
                     border-radius:8px;font-weight:bold">{code}</div>
-        <p style="color:#666">验证码有效期为 10 分钟，请尽快使用。</p>
+        <p style="color:#666">验证码有效期为 2 分钟，请尽快使用。</p>
     </div>"""
 
     return _send_raw(email, subject, body)

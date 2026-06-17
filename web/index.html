@@ -358,6 +358,7 @@
     <select id="modelSelector" class="model-select"></select>
     <button class="btn btn-sm" onclick="resetChat()">↺</button>
     <button class="btn btn-sm" onclick="openSettings()">⚙</button>
+    <button class="btn btn-sm" onclick="openProfile()">👤</button>
   </div>
 </header>
 
@@ -404,6 +405,34 @@
         Mini Agent — 从零搭建的最小化 AI Agent 框架<br>
         代码: <a href="https://github.com/theking0912/mini-agent" target="_blank" style="color:var(--primary)">github.com/theking0912/mini-agent</a>
       </p>
+    </div>
+  </div>
+</div>
+
+<!-- Profile -->
+<div class="settings-overlay" id="profileOverlay">
+  <div class="settings-panel">
+    <h2>
+      👤 个人信息
+      <button class="close-btn" onclick="closeProfile()">✕</button>
+    </h2>
+
+    <div class="settings-section">
+      <div style="text-align:center;padding:12px 0">
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:24px;color:white;margin:0 auto 12px" id="profileAvatar">?</div>
+        <div style="font-size:15px;font-weight:600" id="profileName">—</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px" id="profileEmail">—</div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h3>设置</h3>
+      <button class="btn" style="width:100%;text-align:left;margin-bottom:8px" onclick="closeProfile();openSettings()">⚙ API Key 管理</button>
+      <button class="btn" style="width:100%;text-align:left" onclick="resetChat()">↺ 重置对话</button>
+    </div>
+
+    <div class="settings-section">
+      <button class="btn" style="width:100%;color:var(--error);border-color:var(--error);text-align:center" onclick="logout()">🚪 退出登录</button>
     </div>
   </div>
 </div>
@@ -470,15 +499,11 @@ function updateModelStatus(data) {
   const current = data.models.find(m => m.name === data.current);
   if (!current) return;
   const el = document.getElementById('modelStatus');
-  const dot = current.has_key ? 
-    '<span style="color:var(--success)">●</span>' : 
-    '<span style="color:var(--error)">●</span>';
-  const total = data.models.length;
-  const configured = data.models.filter(m => m.has_key).length;
-  const summary = configured > 0 ? 
-    `<span style="color:var(--text2);font-size:11px;margin-left:8px">🔑 ${configured}/${total}</span>` : 
-    `<span style="color:var(--error);font-size:11px;margin-left:8px">🔑 未配置</span>`;
-  el.innerHTML = `${dot} ${current.description}${summary}`;
+  if (current.has_key) {
+    el.innerHTML = '<span style="color:var(--success);font-size:11px">● Key 已配置</span>';
+  } else {
+    el.innerHTML = '<span style="color:var(--error);font-size:11px">● Key 未配置</span>';
+  }
 }
 
 document.getElementById('modelSelector').addEventListener('change', async function() {
@@ -755,13 +780,49 @@ function autoResize(textarea) {
   textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
 }
 
-// Keyboard shortcut: Ctrl+Enter also sends
+// ── Profile ──
+let currentUser = null;
+
+async function openProfile() {
+  document.getElementById('profileOverlay').classList.add('open');
+  try {
+    const res = await fetch('/api/auth/me', {headers: {'Authorization': 'Bearer ' + TOKEN}});
+    const data = await res.json();
+    if (data.user) {
+      currentUser = data.user;
+      const email = data.user.email || '';
+      const name = data.user.display_name || email.split('@')[0];
+      document.getElementById('profileAvatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('profileName').textContent = name;
+      document.getElementById('profileEmail').textContent = email;
+    }
+  } catch {}
+}
+
+function closeProfile() {
+  document.getElementById('profileOverlay').classList.remove('open');
+}
+
+async function logout() {
+  if (!confirm('确定退出登录？')) return;
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: {'Authorization': 'Bearer ' + TOKEN}
+  });
+  localStorage.removeItem('mini_agent_token');
+  window.location.href = '/auth';
+}
+
+// 按 Escape 关闭所有弹窗
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
     const input = document.getElementById('input');
     if (document.activeElement === input) send();
   }
-  if (e.key === 'Escape') closeSettings();
+  if (e.key === 'Escape') {
+    closeSettings();
+    closeProfile();
+  }
 });
 </script>
 </body>
