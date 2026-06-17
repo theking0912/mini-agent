@@ -51,7 +51,7 @@ def get_user_by_token(token: str) -> dict | None:
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cur.execute(
-            "SELECT id, email, display_name, verified, created_at FROM users WHERE token = %s",
+            "SELECT id, email, display_name, avatar, verified, created_at FROM users WHERE token = %s",
             (token,)
         )
         row = cur.fetchone()
@@ -66,7 +66,7 @@ def get_user_by_id(user_id: int) -> dict | None:
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cur.execute(
-            "SELECT id, email, display_name, verified, created_at FROM users WHERE id = %s",
+            "SELECT id, email, display_name, avatar, verified, created_at FROM users WHERE id = %s",
             (user_id,)
         )
         row = cur.fetchone()
@@ -137,6 +137,7 @@ def login_user(email: str, password: str) -> dict | None:
         "id": user["id"],
         "email": user["email"],
         "display_name": user.get("display_name", ""),
+        "avatar": user.get("avatar", ""),
         "verified": user["verified"],
         "token": token,
     }
@@ -210,3 +211,29 @@ def has_user_key(user_id: int, model_name: str) -> bool:
 
 def get_user_api_key(user_id: int, model_name: str) -> str | None:
     return get_user_keys(user_id).get(model_name)
+
+
+# ── 头像管理 ──────────────────────────────────────────────────
+def get_user_avatar(user_id: int) -> str:
+    """获取用户头像路径（存的是 MinIO obj path，空字符串表示用默认头像）"""
+    conn = get_conn_sync()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("SELECT avatar FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+        return row["avatar"] if row and row.get("avatar") else ""
+    finally:
+        cur.close()
+        conn.close()
+
+
+def set_user_avatar(user_id: int, avatar_path: str):
+    """设置用户头像路径"""
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE users SET avatar = %s WHERE id = %s", (avatar_path, user_id))
+    finally:
+        cur.close()
+        conn.close()

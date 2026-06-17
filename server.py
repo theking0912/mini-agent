@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, File, UploadFile
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Response
 import uvicorn
 
@@ -108,6 +108,67 @@ def _minio_put(path: str, data: bytes, content_type: str) -> bool:
             return resp.status in (200, 204)
     except Exception as e:
         print(f"MinIO PUT 失败: {e}")
+        return False
+
+
+def _minio_delete(path: str) -> bool:
+    """删除 MinIO 对象（忽略 404）"""
+    import hashlib, hmac
+    from datetime import datetime as dt
+
+    bucket, obj = path.split("/", 1)
+    host = MINIO_ENDPOINT.replace("http://", "")
+    date_str = dt.utcnow().strftime("%Y%m%d")
+    amz_date = dt.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+    service = "s3"
+    region = "us-east-1"
+    signed_headers = "host;x-amz-content-sha256;x-amz-date"
+    payload_hash = hashlib.sha256(b"").hexdigest()
+
+    canonical_req = (
+        f"DELETE\n/{bucket}/{obj}\n\n"
+        f"host:{host}\n"
+        f"x-amz-content-sha256:{payload_hash}\n"
+        f"x-amz-date:{amz_date}\n\n"
+        f"{signed_headers}\n{payload_hash}"
+    )
+    algo = "AWS4-HMAC-SHA256"
+    credential_scope = f"{date_str}/{region}/{service}/aws4_request"
+    string_to_sign = (
+        f"{algo}\n{amz_date}\n{credential_scope}\n"
+        f"{hashlib.sha256(canonical_req.encode()).hexdigest()}"
+    )
+
+    def sign(key, msg):
+        return hmac.new(key, msg.encode(), hashlib.sha256).digest()
+
+    date_key = sign(("AWS4" + MINIO_SECRET_KEY).encode(), date_str)
+    region_key = sign(date_key, region)
+    service_key = sign(region_key, service)
+    signing_key = sign(service_key, "aws4_request")
+    signature = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+
+    auth_header = (
+        f"{algo} Credential={MINIO_ACCESS_KEY}/{credential_scope}, "
+        f"SignedHeaders={signed_headers}, Signature={signature}"
+    )
+
+    req = _urllib.Request(
+        f"{MINIO_ENDPOINT}/{bucket}/{obj}",
+        method="DELETE",
+        headers={
+            "Host": host,
+            "x-amz-content-sha256": payload_hash,
+            "x-amz-date": amz_date,
+            "Authorization": auth_header,
+        },
+    )
+    try:
+        with _urllib.urlopen(req, timeout=10) as resp:
+            return resp.status in (200, 204, 404)
+    except Exception as e:
+        print(f"MinIO DELETE 失败: {e}")
         return False
 
 
@@ -327,113 +388,59 @@ async def auth_logout(request: Request):
 # ── 头像 ──────────────────────────────────────────────────────
 @ app.get("/api/avatar/{user_id}")
 async def get_avatar(user_id: int):
-    """从 MinIO 获取用户头像，按格式自动检测"""
-    # 尝试多种格式
-    for ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
-        url = f"{MINIO_ENDPOINT}/{AVATAR_BUCKET}/{user_id}.{ext}"
+    """从 MinIO 获取用户上传的头像，没有则返回 404"""
+    avatar_path = user.get_user_avatar(user_id)
+    if avatar_path:
+        bucket, obj = avatar_path.split("/", 1)
+        url = f"{MINIO_ENDPOINT}/{bucket}/{obj}"
         try:
             req = _urllib.Request(url)
             req.add_header("User-Agent", "MiniAgent/1.0")
             with _urllib.urlopen(req, timeout=3) as resp:
                 data = resp.read()
-            media_map = {
-                "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-                "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
-            }
-            return Response(content=data, media_type=media_map.get(ext, "image/png"))
+            ct = resp.headers.get("Content-Type", "image/png")
+            return Response(content=data, media_type=ct)
         except Exception:
-            continue
-    # 回退：生成初始头像
-    u = user.get_user_by_id(user_id)
-    letter = (u["email"][0].upper() if u else "?")
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
-  <rect width="200" height="200" rx="100" fill="#6c5ce7"/>
-  <text x="100" y="130" font-size="80" font-family="sans-serif" fill="white" text-anchor="middle" font-weight="600">{letter}</text>
-</svg>'''
-    return Response(content=svg.encode(), media_type="image/svg+xml")
+            pass
+    return Response(status_code=404)
 
 
 @ app.post("/api/avatar/upload")
-async def upload_avatar(request: Request):
-    """上传用户头像到 MinIO"""
+async def upload_avatar(request: Request, file: UploadFile = File(...)):
+    """上传用户头像到 MinIO（自动清理旧扩展名）"""
     u = _get_user(request)
     if not u:
         return JSONResponse({"error": "请先登录"}, status_code=401)
 
-    # 解析 multipart form（不用 cgi，Python 3.13 已移除）
-    body = await request.body()
-
-    # 最大 10MB
-    MAX_SIZE = 10 * 1024 * 1024
-    if len(body) > MAX_SIZE:
-        return JSONResponse({"error": "文件太大，最大支持 10MB"}, status_code=400)
-    content_type = request.headers.get("content-type", "")
-
     # 只支持常见图片格式
     allowed_types = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+    if file.content_type not in allowed_types:
+        return JSONResponse({"error": f"不支持的文件类型: {file.content_type}"}, status_code=400)
 
-    # 提取 boundary
-    boundary = ""
-    for part in content_type.split(";"):
-        part = part.strip()
-        if part.startswith("boundary="):
-            boundary = part[len("boundary="):].strip().strip('"').strip("'")
-            break
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        return JSONResponse({"error": "文件太大，最大支持 10MB"}, status_code=400)
 
-    if not boundary:
-        return JSONResponse({"error": "请求格式错误（缺少 boundary）"}, status_code=400)
-
-    boundary_bytes = boundary.encode()
-    parts = body.split(b"--" + boundary_bytes)
-
-    file_data = None
-    file_type = None
-
-    for part in parts:
-        if b"Content-Disposition" not in part:
-            continue
-        # 跳过不含 filename 的部分
-        if b'filename="' not in part and b"filename='" not in part:
-            continue
-        # 提取 Content-Type
-        ct_idx = part.find(b"Content-Type:")
-        if ct_idx == -1:
-            continue
-        ct_line_end = part.find(b"\r\n", ct_idx)
-        if ct_line_end == -1:
-            ct_line_end = part.find(b"\n", ct_idx)
-        file_type = part[ct_idx + len(b"Content-Type:"):ct_line_end].strip().decode().lower()
-        if file_type not in allowed_types:
-            return JSONResponse({"error": f"不支持的文件类型: {file_type}"}, status_code=400)
-        # 找到 headers 结束位置（空行）
-        header_end = part.find(b"\r\n\r\n", ct_line_end)
-        if header_end == -1:
-            header_end = part.find(b"\n\n", ct_line_end)
-        if header_end == -1:
-            continue
-        file_data = part[header_end + 4 if part[header_end:header_end+4] == b"\r\n\r\n" else header_end + 2:]
-        # 精确截断尾部的 \r\n--boundary 标记
-        term_idx = file_data.find(b"\r\n--")
-        if term_idx > 0:
-            file_data = file_data[:term_idx]
-        break
-
-    if not file_data:
-        return JSONResponse({"error": "未找到上传的文件"}, status_code=400)
-
-    # 确定扩展名
     ext_map = {
         "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif",
         "image/webp": "webp", "image/svg+xml": "svg",
     }
-    ext = ext_map.get(file_type, "png")
+    ext = ext_map[file.content_type]
     obj_path = f"{AVATAR_BUCKET}/{u['id']}.{ext}"
 
-    if not _minio_put(obj_path, file_data, file_type):
+    # 先清理旧扩展名的头像文件，防止 get_avatar 找到旧文件
+    for old_ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
+        if old_ext == ext:
+            continue
+        _minio_delete(f"{AVATAR_BUCKET}/{u['id']}.{old_ext}")
+
+    if not _minio_put(obj_path, data, file.content_type):
         return JSONResponse({"error": "上传到 MinIO 失败"}, status_code=500)
 
-    avatar_url = f"{MINIO_ENDPOINT}/{obj_path}"
-    return {"message": "头像已更新", "url": avatar_url}
+    # 记录头像路径到用户表
+    user.set_user_avatar(u["id"], obj_path)
+
+    return {"message": "头像已更新", "url": f"{MINIO_ENDPOINT}/{obj_path}"}
 
 
 # ── 聊天 API ──────────────────────────────────────────────────

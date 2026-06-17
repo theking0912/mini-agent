@@ -260,7 +260,6 @@
     header { padding: 8px 10px; }
     header h1 { font-size: 14px; }
     .header-actions { gap: 4px; }
-    #modelStatus { display: none; }
     .btn-sm { padding: 3px 7px; font-size: 11px; }
     #modelSelector { max-width: 120px; font-size: 12px; padding: 4px 8px; }
     .input-bar { padding: 8px 10px; }
@@ -404,8 +403,8 @@
     <span id="modelStatus" style="font-size:12px;color:var(--text2)"></span>
     <select id="modelSelector" class="model-select"></select>
     <button class="btn btn-sm" onclick="openProfile('info')" id="profileBtn" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--primary)">
-      <span id="headerAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%"><svg class="icon-svg" style="width:18px;height:18px;color:white"><use href="#icon-user"/></svg></span>
-      <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('headerAvatarFallback').style.display='flex'">
+      <span id="headerAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%"></span>
+      <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none'">
     </button>
   </div>
 </header>
@@ -449,18 +448,15 @@
       <div class="settings-section">
         <div style="text-align:center;padding:12px 0">
           <div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:32px;color:white;margin:0 auto 8px;overflow:hidden;position:relative;cursor:pointer" id="profileAvatar" onclick="document.getElementById('avatarInput').click()" title="点击更换头像">
-            <span id="profileAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">?</span>
-            <img id="profileAvatarImg" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none';document.getElementById('profileAvatarFallback').style.display='flex'">
+            <span id="profileAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%"></span>
+            <img id="profileAvatarImg" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none'">
             <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);color:white;font-size:11px;padding:3px 0;display:none" id="avatarHoverHint">更换</div>
           </div>
-          <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" capture="environment" style="display:none" onchange="uploadAvatar(this.files[0])">
+          <input type="file" id="avatarInput" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatar(this.files[0])">
           <div id="avatarUploadStatus" style="font-size:12px;color:var(--text2);min-height:18px;margin-bottom:4px"></div>
           <div style="font-size:15px;font-weight:600" id="profileName">—</div>
           <div style="font-size:12px;color:var(--text2);margin-top:4px" id="profileEmail">—</div>
         </div>
-      </div>
-      <div class="settings-section">
-        <button class="btn" style="width:100%;text-align:left" onclick="resetChat()">↺ 重置对话</button>
       </div>
       <div class="settings-section">
         <button class="btn" style="width:100%;color:var(--error);border-color:var(--error);text-align:center" onclick="logout()"><svg class="icon-svg lg" style="margin-right:6px;color:var(--error)"><use href="#icon-logout"/></svg>退出登录</button>
@@ -539,16 +535,26 @@ init();
 
 function loadHeaderAvatar(user) {
   if (!user) return;
-  const email = user.email || '';
-  const name = user.display_name || email.split('@')[0];
   const img = document.getElementById('headerAvatar');
   const fallback = document.getElementById('headerAvatarFallback');
-  fallback.textContent = name[0].toUpperCase();
-  img.src = '/api/avatar/' + user.id + '?t=' + Date.now();
-  img.onload = function() {
-    fallback.style.display = 'none';
-    img.style.display = 'block';
-  };
+  if (user.avatar) {
+    // 有头像记录，加载真实头像（不闪默认图）
+    img.style.display = 'none';
+    fallback.style.display = 'flex';
+    img.onload = function() {
+      img.style.display = 'block';
+      fallback.style.display = 'none';
+    };
+    img.onerror = function() {
+      img.style.display = 'none';
+      fallback.style.display = 'flex';
+    };
+    img.src = '/api/avatar/' + user.id + '?t=' + Date.now();
+  } else {
+    // 无头像，直接保留默认头像，不请求服务端
+    img.style.display = 'none';
+    fallback.style.display = 'flex';
+  }
 }
 
 // ── Models ──
@@ -888,17 +894,26 @@ async function loadProfileInfo() {
       currentUser = data.user;
       const email = data.user.email || '';
       const name = data.user.display_name || email.split('@')[0];
-      // 同时加载 img 和 fallback，img 成功后隐藏 fallback
       const img = document.getElementById('profileAvatarImg');
       const fallback = document.getElementById('profileAvatarFallback');
-      fallback.style.display = 'flex';
-      fallback.textContent = name[0].toUpperCase();
-      img.style.display = 'none';
-      img.src = '/api/avatar/' + data.user.id + '?t=' + Date.now();
-      img.onload = function() {
-        fallback.style.display = 'none';
-        img.style.display = 'block';
-      };
+      if (data.user.avatar) {
+        // 有头像记录，加载真实头像（不闪默认图）
+        img.style.display = 'none';
+        fallback.style.display = 'flex';
+        img.onload = function() {
+          img.style.display = 'block';
+          fallback.style.display = 'none';
+        };
+        img.onerror = function() {
+          img.style.display = 'none';
+          fallback.style.display = 'flex';
+        };
+        img.src = '/api/avatar/' + data.user.id + '?t=' + Date.now();
+      } else {
+        // 无头像，直接保留默认头像，不请求服务端
+        img.style.display = 'none';
+        fallback.style.display = 'flex';
+      }
       document.getElementById('profileName').textContent = name;
       document.getElementById('profileEmail').textContent = email;
     }
@@ -924,23 +939,37 @@ async function uploadAvatar(file) {
       status.textContent = '❌ ' + data.error;
     } else {
       status.textContent = '✅ 头像已更新';
-      // 通过代理 URL 刷新头像（不用 MinIO 直连 URL，浏览器可能跨域/网络不可达）
       const userId = currentUser?.id;
       const img = document.getElementById('profileAvatarImg');
       const fallback = document.getElementById('profileAvatarFallback');
-      const name = document.getElementById('profileName').textContent;
-      fallback.style.display = 'flex';
-      fallback.textContent = name[0].toUpperCase();
-      img.style.display = 'none';
-      img.src = (userId ? '/api/avatar/' + userId : data.url) + '?t=' + Date.now();
+      // 有头像记录，加载真实头像
+      if (currentUser) currentUser.avatar = 'avatars/' + userId;
       img.onload = function() {
-        fallback.style.display = 'none';
         img.style.display = 'block';
+        fallback.style.display = 'none';
       };
+      img.onerror = function() {
+        img.style.display = 'none';
+        fallback.style.display = 'flex';
+      };
+      img.style.display = 'none';
+      fallback.style.display = 'flex';
+      img.src = (userId ? '/api/avatar/' + userId : data.url) + '?t=' + Date.now();
       // 同时更新头部头像
-      const avatarEl = document.getElementById('headerAvatar');
-      if (avatarEl && userId) {
-        avatarEl.src = '/api/avatar/' + userId + '?t=' + Date.now();
+      const headerImg = document.getElementById('headerAvatar');
+      const headerFallback = document.getElementById('headerAvatarFallback');
+      if (headerImg && userId) {
+        headerImg.onload = function() {
+          headerImg.style.display = 'block';
+          headerFallback.style.display = 'none';
+        };
+        headerImg.onerror = function() {
+          headerImg.style.display = 'none';
+          headerFallback.style.display = 'flex';
+        };
+        headerImg.style.display = 'none';
+        headerFallback.style.display = 'flex';
+        headerImg.src = '/api/avatar/' + userId + '?t=' + Date.now();
       }
       setTimeout(() => { status.textContent = ''; }, 3000);
     }
