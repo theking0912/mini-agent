@@ -129,3 +129,46 @@ def init_db():
     cur.close()
     conn.close()
     print("[DB] 数据库表结构就绪")
+
+    # 迁移存量明文 Key 到加密存储
+    _migrate_plaintext_keys()
+
+
+def _migrate_plaintext_keys():
+    """将存量明文 API Key 迁移为加密存储"""
+    import json
+    try:
+        from core import keyring
+    except Exception:
+        return  # keyring 未就绪时跳过
+
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cur.execute("SELECT id, api_keys FROM users WHERE api_keys IS NOT NULL AND api_keys != '{}'::jsonb")
+    rows = cur.fetchall()
+
+    migrated = 0
+    for row in rows:
+        raw = dict(row["api_keys"])
+        changed = {}
+        for model, val in raw.items():
+            if isinstance(val, str) and val.startswith("gAAAAAB"):
+                continue  # 已是密文
+            try:
+                changed[model] = keyring.encrypt_value(val)
+            except Exception:
+                pass
+        if changed:
+            cur.execute(
+                "UPDATE users SET api_keys = %s::jsonb WHERE id = %s",
+                (json.dumps(changed), row["id"]),
+            )
+            migrated += 1
+
+    if migrated:
+        print(f"[DB] 已加密 {migrated} 个用户的 API Key")
+
+    cur.close()
+    conn.close()
