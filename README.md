@@ -1,5 +1,7 @@
 # 🤖 Mini Agent — 从零搭建的 AI Agent
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/theking0912/mini-agent)
+
 一个最小化的 AI Agent 框架，展示 Tool Calling 核心执行原理。
 
 全部代码 **695 行纯 Python**，零 AI 框架依赖，只用 httpx 裸调 HTTP API。
