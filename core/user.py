@@ -61,6 +61,21 @@ def get_user_by_token(token: str) -> dict | None:
         conn.close()
 
 
+def get_user_by_id(user_id: int) -> dict | None:
+    conn = get_conn_sync()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT id, email, display_name, verified, created_at FROM users WHERE id = %s",
+            (user_id,)
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        cur.close()
+        conn.close()
+
+
 def create_user(email: str, password: str) -> dict:
     pw_hash = hash_password(password)
     conn = get_conn_sync()

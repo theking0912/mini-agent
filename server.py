@@ -20,6 +20,7 @@ from core.context import Context
 from core import user, email as email_svc, verify
 from core.db import init_db, get_redis
 from tools import registry
+import urllib.request as _urllib
 
 # Redis 客户端
 redis_client = get_redis()
@@ -29,6 +30,12 @@ app = FastAPI(title="Mini Agent Web UI")
 
 # 每个会话独立上下文（简单起见用单个，后续可扩展为多会话）
 _context = Context()
+
+# ── MinIO 配置 ────────────────────────────────────────────────
+MINIO_ENDPOINT = "http://172.18.0.1:9000"
+MINIO_ACCESS_KEY = "leroy"
+MINIO_SECRET_KEY = "Leroy.Lee_09.12.24"
+AVATAR_BUCKET = "avatars"
 
 
 # ── 认证辅助 ──────────────────────────────────────────────────
@@ -40,7 +47,71 @@ def _get_user(request: Request) -> dict | None:
     return user.get_user_by_token(token)
 
 
-@app.on_event("startup")
+def _minio_put(path: str, data: bytes, content_type: str) -> bool:
+    """上传文件到 MinIO（兼容 AWS S3 API）"""
+    import base64, hashlib, hmac
+    from datetime import datetime as dt
+
+    bucket, obj = path.split("/", 1)
+    host = MINIO_ENDPOINT.replace("http://", "")
+    date_str = dt.utcnow().strftime("%Y%m%d")
+    amz_date = dt.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+    # 构造签名
+    service = "s3"
+    region = "us-east-1"
+    signed_headers = "host;x-amz-content-sha256;x-amz-date"
+    payload_hash = hashlib.sha256(data).hexdigest()
+
+    canonical_req = (
+        f"PUT\n/{bucket}/{obj}\n\n"
+        f"host:{host}\n"
+        f"x-amz-content-sha256:{payload_hash}\n"
+        f"x-amz-date:{amz_date}\n\n"
+        f"{signed_headers}\n{payload_hash}"
+    )
+    algo = "AWS4-HMAC-SHA256"
+    credential_scope = f"{date_str}/{region}/{service}/aws4_request"
+    string_to_sign = (
+        f"{algo}\n{amz_date}\n{credential_scope}\n"
+        f"{hashlib.sha256(canonical_req.encode()).hexdigest()}"
+    )
+
+    def sign(key, msg):
+        return hmac.new(key, msg.encode(), hashlib.sha256).digest()
+
+    date_key = sign(("AWS4" + MINIO_SECRET_KEY).encode(), date_str)
+    region_key = sign(date_key, region)
+    service_key = sign(region_key, service)
+    signing_key = sign(service_key, "aws4_request")
+    signature = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+
+    auth_header = (
+        f"{algo} Credential={MINIO_ACCESS_KEY}/{credential_scope}, "
+        f"SignedHeaders={signed_headers}, Signature={signature}"
+    )
+
+    req = _urllib.Request(
+        f"{MINIO_ENDPOINT}/{bucket}/{obj}",
+        data=data,
+        method="PUT",
+        headers={
+            "Host": host,
+            "x-amz-content-sha256": payload_hash,
+            "x-amz-date": amz_date,
+            "Authorization": auth_header,
+            "Content-Type": content_type,
+        },
+    )
+    try:
+        with _urllib.urlopen(req, timeout=10) as resp:
+            return resp.status in (200, 204)
+    except Exception as e:
+        print(f"MinIO PUT 失败: {e}")
+        return False
+
+
+@ app.on_event("startup")
 async def startup():
     """初始化数据库"""
     try:
@@ -52,7 +123,7 @@ async def startup():
 
 
 # ── 静态页面 ──────────────────────────────────────────────────
-@app.get("/")
+@ app.get("/")
 async def index():
     html_path = Path(__file__).resolve().parent / "web" / "index.html"
     if html_path.exists():
@@ -60,7 +131,7 @@ async def index():
     return "<h1>web/index.html not found</h1>"
 
 
-@app.get("/auth")
+@ app.get("/auth")
 async def auth_page():
     html_path = Path(__file__).resolve().parent / "web" / "auth.html"
     if html_path.exists():
@@ -69,7 +140,7 @@ async def auth_page():
 
 
 # ── 模型 API ──────────────────────────────────────────────────
-@app.get("/api/models")
+@ app.get("/api/models")
 async def list_models(request: Request):
     cfg = get_config()
     u = _get_user(request)
@@ -90,7 +161,7 @@ async def list_models(request: Request):
     return {"models": models, "current": cfg.current_model.name}
 
 
-@app.post("/api/switch")
+@ app.post("/api/switch")
 async def switch_model(request: Request):
     data = await request.json()
     name = data.get("model", "")
@@ -102,7 +173,7 @@ async def switch_model(request: Request):
 
 
 # ── Key 管理 ──────────────────────────────────────────────────
-@app.post("/api/key/set")
+@ app.post("/api/key/set")
 async def key_set(request: Request):
     u = _get_user(request)
     if not u:
@@ -116,7 +187,7 @@ async def key_set(request: Request):
     return {"message": f"✅ {model_name} 的 API Key 已保存"}
 
 
-@app.post("/api/key/remove")
+@ app.post("/api/key/remove")
 async def key_remove(request: Request):
     u = _get_user(request)
     if not u:
@@ -128,7 +199,7 @@ async def key_remove(request: Request):
     return JSONResponse({"error": f"{model_name} 没有保存的 Key"}, status_code=404)
 
 
-@app.get("/api/key/list")
+@ app.get("/api/key/list")
 async def key_list(request: Request):
     u = _get_user(request)
     if not u:
@@ -147,7 +218,7 @@ async def key_list(request: Request):
 
 
 # ── 对话管理 ──────────────────────────────────────────────────
-@app.post("/api/reset")
+@ app.post("/api/reset")
 async def reset_context():
     global _context
     _context = Context()
@@ -155,7 +226,7 @@ async def reset_context():
 
 
 # ── 用户认证 API ──────────────────────────────────────────────
-@app.post("/api/auth/register")
+@ app.post("/api/auth/register")
 async def auth_register(request: Request):
     data = await request.json()
     email = data.get("email", "").strip().lower()
@@ -176,8 +247,9 @@ async def auth_register(request: Request):
         await email_svc.send_verification_code(email, code, "register")
 
         # 临时保存用户信息到 Redis（等待验证后写入 DB）
+        # 注意：这里存原始密码，create_user 内部会做哈希
         redis_client.hset(f"pending_user:{email}", mapping={
-            "password": user.hash_password(password),
+            "password": password,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
         redis_client.expire(f"pending_user:{email}", 600)
@@ -189,7 +261,7 @@ async def auth_register(request: Request):
         return JSONResponse({"error": f"注册失败: {e}"}, status_code=500)
 
 
-@app.post("/api/auth/verify")
+@ app.post("/api/auth/verify")
 async def auth_verify(request: Request):
     data = await request.json()
     email = data.get("email", "").strip().lower()
@@ -216,7 +288,7 @@ async def auth_verify(request: Request):
         return JSONResponse({"error": f"注册失败: {e}"}, status_code=500)
 
 
-@app.post("/api/auth/login")
+@ app.post("/api/auth/login")
 async def auth_login(request: Request):
     data = await request.json()
     email = data.get("email", "").strip().lower()
@@ -236,7 +308,7 @@ async def auth_login(request: Request):
         return JSONResponse({"error": f"登录失败: {e}"}, status_code=500)
 
 
-@app.get("/api/auth/me")
+@ app.get("/api/auth/me")
 async def auth_me(request: Request):
     u = _get_user(request)
     if not u:
@@ -244,7 +316,7 @@ async def auth_me(request: Request):
     return {"user": u}
 
 
-@app.post("/api/auth/logout")
+@ app.post("/api/auth/logout")
 async def auth_logout(request: Request):
     u = _get_user(request)
     if u:
@@ -253,31 +325,114 @@ async def auth_logout(request: Request):
 
 
 # ── 头像 ──────────────────────────────────────────────────────
-import urllib.request as _urllib
-
-@app.get("/api/avatar/{user_id}")
+@ app.get("/api/avatar/{user_id}")
 async def get_avatar(user_id: int):
-    """从 MinIO 获取用户头像"""
-    # 暂用默认 SVG 头像
-    avatar_url = "http://172.18.0.1:9000/avatars/default.svg"
-    try:
-        req = _urllib.Request(avatar_url)
-        req.add_header("User-Agent", "MiniAgent/1.0")
-        with _urllib.urlopen(req, timeout=5) as resp:
-            data = resp.read()
-        return Response(content=data, media_type="image/svg+xml")
-    except Exception:
-        # 回退：生成内联 SVG
-        name = f"U{user_id}"
-        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+    """从 MinIO 获取用户头像，按格式自动检测"""
+    # 尝试多种格式
+    for ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
+        url = f"{MINIO_ENDPOINT}/{AVATAR_BUCKET}/{user_id}.{ext}"
+        try:
+            req = _urllib.Request(url)
+            req.add_header("User-Agent", "MiniAgent/1.0")
+            with _urllib.urlopen(req, timeout=3) as resp:
+                data = resp.read()
+            media_map = {
+                "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
+            }
+            return Response(content=data, media_type=media_map.get(ext, "image/png"))
+        except Exception:
+            continue
+    # 回退：生成初始头像
+    u = user.get_user_by_id(user_id)
+    letter = (u["email"][0].upper() if u else "?")
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
   <rect width="200" height="200" rx="100" fill="#6c5ce7"/>
-  <text x="100" y="130" font-size="80" font-family="sans-serif" fill="white" text-anchor="middle" font-weight="600">{name[0].upper()}</text>
+  <text x="100" y="130" font-size="80" font-family="sans-serif" fill="white" text-anchor="middle" font-weight="600">{letter}</text>
 </svg>'''
-        return Response(content=svg.encode(), media_type="image/svg+xml")
+    return Response(content=svg.encode(), media_type="image/svg+xml")
+
+
+@ app.post("/api/avatar/upload")
+async def upload_avatar(request: Request):
+    """上传用户头像到 MinIO"""
+    u = _get_user(request)
+    if not u:
+        return JSONResponse({"error": "请先登录"}, status_code=401)
+
+    # 解析 multipart form（不用 cgi，Python 3.13 已移除）
+    body = await request.body()
+    content_type = request.headers.get("content-type", "")
+
+    # 只支持常见图片格式
+    allowed_types = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"}
+
+    # 提取 boundary
+    boundary = ""
+    for part in content_type.split(";"):
+        part = part.strip()
+        if part.startswith("boundary="):
+            boundary = part[len("boundary="):].strip().strip('"').strip("'")
+            break
+
+    if not boundary:
+        return JSONResponse({"error": "请求格式错误（缺少 boundary）"}, status_code=400)
+
+    boundary_bytes = boundary.encode()
+    parts = body.split(b"--" + boundary_bytes)
+
+    file_data = None
+    file_type = None
+
+    for part in parts:
+        if b"Content-Disposition" not in part:
+            continue
+        # 跳过不含 filename 的部分
+        if b'filename="' not in part and b"filename='" not in part:
+            continue
+        # 提取 Content-Type
+        ct_idx = part.find(b"Content-Type:")
+        if ct_idx == -1:
+            continue
+        ct_line_end = part.find(b"\r\n", ct_idx)
+        if ct_line_end == -1:
+            ct_line_end = part.find(b"\n", ct_idx)
+        file_type = part[ct_idx + len(b"Content-Type:"):ct_line_end].strip().decode().lower()
+        if file_type not in allowed_types:
+            return JSONResponse({"error": f"不支持的文件类型: {file_type}"}, status_code=400)
+        # 找到 headers 结束位置（空行）
+        header_end = part.find(b"\r\n\r\n", ct_line_end)
+        if header_end == -1:
+            header_end = part.find(b"\n\n", ct_line_end)
+        if header_end == -1:
+            continue
+        file_data = part[header_end + 4 if part[header_end:header_end+4] == b"\r\n\r\n" else header_end + 2:]
+        # 精确截断尾部的 \r\n--boundary 标记
+        term_idx = file_data.find(b"\r\n--")
+        if term_idx > 0:
+            file_data = file_data[:term_idx]
+        break
+
+    if not file_data:
+        return JSONResponse({"error": "未找到上传的文件"}, status_code=400)
+
+    # 确定扩展名
+    ext_map = {
+        "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif",
+        "image/webp": "webp", "image/svg+xml": "svg",
+    }
+    ext = ext_map.get(file_type, "png")
+    obj_path = f"{AVATAR_BUCKET}/{u['id']}.{ext}"
+
+    if not _minio_put(obj_path, file_data, file_type):
+        return JSONResponse({"error": "上传到 MinIO 失败"}, status_code=500)
+
+    avatar_url = f"{MINIO_ENDPOINT}/{obj_path}"
+    return {"message": "头像已更新", "url": avatar_url}
 
 
 # ── 聊天 API ──────────────────────────────────────────────────
-@app.post("/api/chat")
+@ app.post("/api/chat")
 async def chat(request: Request):
     u = _get_user(request)
     if not u:
