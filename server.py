@@ -453,9 +453,15 @@ async def chat(request: Request):
     model_name = cfg.current_model.name
     api_key = user.get_user_api_key(u["id"], model_name) or cfg.current_model.api_key
     if not api_key:
-        return JSONResponse({
-            "error": f"❌ {model_name} 未配置 API Key\n请在设置中添加 Key"
-        }, status_code=400)
+        return StreamingResponse(
+            _stream_no_key(model_name),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     return StreamingResponse(
         _stream_chat(user_message, api_key),
@@ -466,6 +472,13 @@ async def chat(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _stream_no_key(model_name: str) -> AsyncGenerator[str, None]:
+    """SSE: 告知前端未配置 API Key"""
+    yield f"data: {json.dumps({'type': 'start', 'model': model_name})}\n\n"
+    yield f"data: {json.dumps({'type': 'no_key', 'model': model_name})}\n\n"
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 
 async def _stream_chat(user_message: str, api_key: str) -> AsyncGenerator[str, None]:
