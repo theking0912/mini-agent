@@ -4,3 +4,7 @@ cryptography>=41.0.0   # 用于加密 API Key 存储
 fastapi>=0.110.0       # Web UI 后端
 uvicorn>=0.27.0        # Web 服务器
 sse-starlette>=1.8.0   # SSE 流式响应
+
+# 用户注册
+psycopg2-binary>=2.9.0
+redis>=5.0.0

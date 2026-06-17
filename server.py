@@ -21,6 +21,7 @@ import json
 import asyncio
 from pathlib import Path
 from typing import AsyncGenerator
+from datetime import datetime, timezone
 
 # FastAPI
 from fastapi import FastAPI, Request
@@ -34,11 +35,36 @@ from core.tool_runner import run_agent
 from core import keyring
 from tools import registry
 
+# 用户注册
+from core import database as db
+from core import email as email_svc
+import redis as redis_module
+
+# Redis 连接
+redis_client = redis_module.Redis(
+    host=os.environ.get("REDIS_HOST", "172.18.0.1"),
+    port=int(os.environ.get("REDIS_PORT", "6379")),
+    db=0,
+    password=os.environ.get("REDIS_PASSWORD", "LeroyLee"),
+    decode_responses=False,
+)
+
 # ── 应用 ──────────────────────────────────────────────────────
 app = FastAPI(title="Mini Agent Web UI")
 
 # 每个会话独立上下文（简单起见用单个，后续可扩展为多会话）
 _context = Context()
+
+
+@app.on_event("startup")
+async def startup():
+    """初始化数据库"""
+    try:
+        db.init_db()
+        print("🗄️  PostgreSQL 数据库就绪")
+    except Exception as e:
+        print(f"⚠️  PostgreSQL 初始化失败: {e}")
+        print("   请确保 PostgreSQL (172.18.0.1:5433) 和 Redis (172.18.0.1:6379) 已启动")
 
 
 # ── 静态页面 ──────────────────────────────────────────────────
@@ -49,6 +75,15 @@ async def index():
     if html_path.exists():
         return html_path.read_text(encoding="utf-8")
     return "<h1>web/index.html not found</h1>"
+
+
+@app.get("/auth", response_class=HTMLResponse)
+async def auth_page():
+    """返回注册/登录页面"""
+    html_path = Path(__file__).resolve().parent / "web" / "auth.html"
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8")
+    return "<h1>web/auth.html not found</h1>"
 
 
 # ── 模型 API ──────────────────────────────────────────────────
@@ -226,6 +261,114 @@ async def reset_context():
     global _context
     _context = Context()
     return {"message": "对话已重置"}
+
+
+# ── 用户认证 API ──────────────────────────────────────────────
+@app.post("/api/auth/register")
+async def auth_register(request: Request):
+    """用户注册：发送验证码"""
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not email or "@" not in email:
+        return JSONResponse({"error": "请输入有效的邮箱地址"}, status_code=400)
+    if len(password) < 6:
+        return JSONResponse({"error": "密码至少 6 位"}, status_code=400)
+
+    try:
+        # 检查是否已注册
+        existing = db.get_user_by_email(email)
+        if existing:
+            return JSONResponse({"error": "该邮箱已注册"}, status_code=409)
+
+        # 生成验证码
+        code = db.generate_code()
+        db.save_verification_code(email, code, "register")
+
+        # 发送邮件（未配 SMTP 时打印到日志）
+        await email_svc.send_verification_code(email, code, "register")
+
+        # 临时保存用户信息到 Redis（等待验证后写入 DB）
+        redis_client.hset(f"pending_user:{email}", mapping={
+            "password": db.hash_password(password),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        redis_client.expire(f"pending_user:{email}", 600)
+
+        return {"message": f"验证码已发送到 {email}（开发模式查看服务日志）", "email": email}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=409)
+    except Exception as e:
+        return JSONResponse({"error": f"注册失败: {e}"}, status_code=500)
+
+
+@app.post("/api/auth/verify")
+async def auth_verify(request: Request):
+    """验证邮箱 + 完成注册"""
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
+
+    if not email or not code:
+        return JSONResponse({"error": "邮箱和验证码不能为空"}, status_code=400)
+
+    # 验证验证码
+    if not db.verify_code(email, code, "register"):
+        return JSONResponse({"error": "验证码错误或已过期"}, status_code=400)
+
+    # 从 Redis 取出待注册用户
+    pending = redis_client.hgetall(f"pending_user:{email}")
+    if not pending:
+        return JSONResponse({"error": "注册信息已过期，请重新注册"}, status_code=400)
+
+    try:
+        password_hash = pending.get(b"password", b"").decode()
+        user = db.create_user(email, "")
+        # 更新密码哈希
+        conn = db.get_pool().getconn()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user["id"]))
+        conn.commit()
+        db.get_pool().putconn(conn)
+
+        db.verify_user(email)
+        redis_client.delete(f"pending_user:{email}")
+
+        return {"message": "注册成功！请登录", "email": email}
+    except Exception as e:
+        return JSONResponse({"error": f"注册失败: {e}"}, status_code=500)
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    """用户登录"""
+    data = await request.json()
+    email = data.get("email", "").strip().lower()
+    password = data.get("password", "").strip()
+
+    if not email or not password:
+        return JSONResponse({"error": "邮箱和密码不能为空"}, status_code=400)
+
+    try:
+        user = db.login_user(email, password)
+        if not user:
+            return JSONResponse({"error": "邮箱或密码错误"}, status_code=401)
+        return {"message": "登录成功", "user": user}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    """获取当前用户信息（通过 header 中的 token）"""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    user = db.get_user_by_token(token)
+    if not user:
+        return JSONResponse({"error": "登录已过期"}, status_code=401)
+    return {"user": user}
 
 
 # ── 启动 ──────────────────────────────────────────────────────

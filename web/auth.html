@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Agent - 注册 / 登录</title>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #252535;
+    --border: #2e2e42;
+    --text: #e4e4ed;
+    --text2: #9090a8;
+    --primary: #6c5ce7;
+    --primary-dim: #4834d4;
+    --success: #00b894;
+    --warn: #fdcb6e;
+    --error: #e17055;
+    --radius: 10px;
+    --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-container {
+    width: 400px;
+    max-width: 90vw;
+  }
+
+  .auth-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+  }
+
+  .auth-box h1 {
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .auth-box h1 span { color: var(--primary); }
+  .auth-box .subtitle {
+    text-align: center;
+    color: var(--text2);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs button {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text2);
+    padding: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all .15s;
+  }
+  .tabs button.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+  .tabs button:hover { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+  .form-group input {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .form-group input:focus { border-color: var(--primary); }
+  .form-group .hint {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background .15s;
+    font-weight: 500;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dim); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+  .msg {
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    line-height: 1.5;
+  }
+  .msg.error { display: block; background: rgba(225,112,85,.15); border: 1px solid var(--error); color: var(--error); }
+  .msg.success { display: block; background: rgba(0,184,148,.15); border: 1px solid var(--success); color: var(--success); }
+  .msg.info { display: block; background: rgba(108,92,231,.15); border: 1px solid var(--primary); color: var(--primary); }
+
+  .verify-row {
+    display: flex;
+    gap: 8px;
+  }
+  .verify-row input { flex: 1; }
+  .verify-row button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .verify-row button:hover { background: var(--border); }
+  .verify-row button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .go-chat {
+    text-align: center;
+    margin-top: 16px;
+  }
+  .go-chat a {
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .go-chat a:hover { text-decoration: underline; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 13px;
+    display: none;
+    z-index: 100;
+  }
+  .toast.show { display: block; animation: fadeIn .2s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+</style>
+</head>
+<body>
+<div class="auth-container">
+  <div class="auth-box">
+    <h1><span>✦</span> Mini Agent</h1>
+    <p class="subtitle">注册或登录后即可开始对话</p>
+
+    <div class="tabs">
+      <button class="active" onclick="switchTab('login')">登录</button>
+      <button onclick="switchTab('register')">注册</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+
+    <!-- 登录 -->
+    <div id="tabLogin" class="tab-content active">
+      <div class="form-group">
+        <label>邮箱</label>
+        <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" onclick="login()">登录</button>
+      <div class="go-chat">
+        <a href="/">进入聊天 →</a>
+      </div>
+    </div>
+
+    <!-- 注册 -->
+    <div id="tabRegister" class="tab-content">
+      <div class="form-group">
+        <label>邮箱</label>
+        <input type="email" id="regEmail" placeholder="your@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="regPassword" placeholder="至少 6 位" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>发送验证码到邮箱</label>
+        <button class="btn btn-primary" id="sendCodeBtn" onclick="sendCode()">发送验证码</button>
+      </div>
+      <div class="form-group" id="verifyGroup" style="display:none">
+        <label>验证码</label>
+        <div class="verify-row">
+          <input type="text" id="regCode" placeholder="6 位验证码" maxlength="6">
+          <button id="verifyBtn" onclick="verifyCode()">验证</button>
+        </div>
+      </div>
+      <div class="go-chat">
+        <a href="/">已有账号？去登录</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentEmail = '';
+
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  if (name === 'login') {
+    document.querySelector('.tabs button:nth-child(1)').classList.add('active');
+    document.getElementById('tabLogin').classList.add('active');
+  } else {
+    document.querySelector('.tabs button:nth-child(2)').classList.add('active');
+    document.getElementById('tabRegister').classList.add('active');
+  }
+  document.getElementById('msg').className = 'msg';
+}
+
+function showToast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── 登录 ──
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  if (!email || !password) { showMsg('请填写邮箱和密码', 'error'); return; }
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showMsg(data.error, 'error');
+    } else if (data.user) {
+      localStorage.setItem('mini_agent_token', data.user.token);
+      localStorage.setItem('mini_agent_user', JSON.stringify(data.user));
+      showMsg('登录成功！正在跳转...', 'success');
+      setTimeout(() => window.location.href = '/', 800);
+    }
+  } catch (e) {
+    showMsg('登录失败: ' + e.message, 'error');
+  }
+}
+
+// ── 发送验证码 ──
+async function sendCode() {
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  if (!email || email.indexOf('@') === -1) { showMsg('请输入有效的邮箱地址', 'error'); return; }
+  if (password.length < 6) { showMsg('密码至少 6 位', 'error'); return; }
+
+  const btn = document.getElementById('sendCodeBtn');
+  btn.disabled = true;
+  btn.textContent = '发送中...';
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password}),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showMsg(data.error, 'error');
+      btn.disabled = false;
+      btn.textContent = '发送验证码';
+    } else {
+      currentEmail = email;
+      showMsg(data.message, 'info');
+      document.getElementById('verifyGroup').style.display = 'block';
+      // 倒计时 60s
+      let count = 60;
+      const timer = setInterval(() => {
+        count--;
+        btn.textContent = `${count}s 后重发`;
+        if (count <= 0) {
+          clearInterval(timer);
+          btn.disabled = false;
+          btn.textContent = '重新发送';
+        }
+      }, 1000);
+    }
+  } catch (e) {
+    showMsg('发送失败: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '发送验证码';
+  }
+}
+
+// ── 验证注册 ──
+async function verifyCode() {
+  const code = document.getElementById('regCode').value.trim();
+  if (!code || code.length !== 6) { showMsg('请输入 6 位验证码', 'error'); return; }
+
+  const btn = document.getElementById('verifyBtn');
+  btn.disabled = true;
+  btn.textContent = '验证中...';
+
+  try {
+    const res = await fetch('/api/auth/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email: currentEmail, code}),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showMsg(data.error, 'error');
+      btn.disabled = false;
+      btn.textContent = '验证';
+    } else {
+      showMsg('注册成功！请切换到登录页登录', 'success');
+      btn.textContent = '✅ 已验证';
+      // 自动切到登录
+      setTimeout(() => {
+        switchTab('login');
+        document.getElementById('loginEmail').value = currentEmail;
+      }, 1500);
+    }
+  } catch (e) {
+    showMsg('验证失败: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '验证';
+  }
+}
+
+// ── 检查是否已登录 ──
+(function checkLogin() {
+  const token = localStorage.getItem('mini_agent_token');
+  if (token) {
+    fetch('/api/auth/me', {headers: {'Authorization': 'Bearer ' + token}})
+      .then(r => r.json())
+      .then(data => {
+        if (data.user) {
+          // 已登录，显示提示
+          document.querySelector('.subtitle').textContent = `已登录：${data.user.email}`;
+        }
+      })
+      .catch(() => {});
+  }
+})();
+</script>
+</body>
+</html>
