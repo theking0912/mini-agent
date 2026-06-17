@@ -1,108 +1,119 @@
-<div align="center">
+# 🤖 Mini Agent — 从零搭建的 AI Agent
 
-# 🤖 Mini Agent
+一个最小化的 AI Agent 框架，展示 Tool Calling 核心执行原理。
 
-**从零搭建的最小化 AI Agent 框架**
+全部代码 **695 行纯 Python**，零 AI 框架依赖，只用 httpx 裸调 HTTP API。
 
-[![CI](https://github.com/theking0912/mini-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/theking0912/mini-agent/actions/workflows/ci.yml)
-[![Open in Codespaces](https://img.shields.io/badge/Codespaces-Open-blue?logo=github)](https://codespaces.new/theking0912/mini-agent)
-[![Python](https://img.shields.io/badge/Python-3.13+-blue?logo=python)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+## 快速开始
 
-**695 行纯 Python · 无 AI 框架依赖 · 展示 Tool Calling 核心执行原理**
+```bash
+# 安装依赖
+pip install -r requirements.txt
 
-</div>
+# 设置 API Key（看你用哪个模型）
+export DEEPSEEK_API_KEY='sk-xxx'
+export OPENAI_API_KEY='sk-xxx'
 
----
+# 交互模式
+python agent.py
+
+# 单次查询
+python agent.py "计算 2 的 10 次方"
+
+# 指定模型
+python agent.py --model gpt4o-mini "搜索 AI 新闻"
+```
+
+## 多模型配置
+
+支持多个 LLM Provider 共存，每个模型独立配置 API Key。
+
+配置文件：`config/models.json`
+
+```json
+{
+  "default": "deepseek",
+  "models": {
+    "deepseek": {
+      "api_key": "${DEEPSEEK_API_KEY}",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "description": "DeepSeek V3"
+    },
+    "gpt4o": {
+      "api_key": "${OPENAI_API_KEY}",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o",
+      "description": "OpenAI GPT-4o"
+    }
+  }
+}
+```
+
+### Key 管理原则
+
+- **API Key 不进配置文件** — 使用 `${ENV_VAR_NAME}` 语法引用环境变量
+- **运行时插值** — 启动时从环境变量读取实际的 Key
+- **不同模型可以共用同一个 Key**（如 DeepSeek 系列共用 DEEPSEEK_API_KEY）
+- **无配置文件时自动回退**到传统的 `OPENAI_API_KEY` 环境变量
+
+### 交互式模型切换
+
+在交互式 REPL 中：
+
+```
+🙋 > /model
+
+📡 可用模型：
+   deepseek          DeepSeek V3                   [deepseek-chat] ✅
+   gpt4o             OpenAI GPT-4o                 [gpt-4o]        ✅ ◀
+   gpt4o-mini        OpenAI GPT-4o Mini            [gpt-4o-mini]   ✅
+
+  输入 /model NAME 切换
+  输入 /reload 重新加载配置文件
+
+🙋 > /model deepseek
+  🔄 已切换: gpt4o → deepseek (DeepSeek V3) [deepseek-chat]
+```
 
 ## 项目结构
 
 ```
 mini-agent/
-├── agent.py              ← 入口（交互式 REPL / 单次查询）
+├── agent.py              ← 入口（交互式 REPL + 命令行）
+├── requirements.txt      ← 唯一依赖：httpx
+├── config/
+│   └── models.json       ← 多模型配置文件
 ├── core/
-│   ├── llm.py            ← LLM 通信层（httpx 裸调 API，不依赖 SDK）
-│   ├── context.py        ← 对话上下文管理（消息历史 + 自动裁剪）
-│   └── tool_runner.py    ← 核心执行引擎（Tool Calling Loop）
-├── tools/
-│   ├── registry.py       ← 工具注册中心（schema 生成 + 分发执行）
-│   ├── calculator.py     ← 计算器（AST 安全求值，不用 eval）
-│   ├── file_tool.py      ← 文件读取（安全路径校验）
-│   └── web_search.py     ← 网络搜索（DuckDuckGo，无需 API Key）
-├── scripts/
-│   └── test_imports.py   ← CI 导入测试
-├── .devcontainer/        ← GitHub Codespaces 配置
-└── .github/workflows/    ← CI 自动检查
+│   ├── llm.py            ← LLM API 通信层（HTTP 原始调用）
+│   ├── config.py         ← 模型配置加载器（支持多 Key / 多 Provider）
+│   ├── context.py        ← 对话上下文管理
+│   └── tool_runner.py    ← 工具调用环（核心执行引擎）
+└── tools/
+    ├── registry.py       ← 工具注册中心
+    ├── calculator.py     ← 计算器工具
+    ├── file_tool.py      ← 文件读取工具
+    └── web_search.py     ← 网络搜索工具
 ```
 
-## 核心执行流程
+## 架构演进
 
-```
-用户输入
-    ↓
- 1. chat(messages + tools) → LLM 返回 tool_calls 或文本
-    ↓                    ↙
- 2. 如果有 tool_calls ──→ 逐个执行工具 → 结果写回 messages[tool role]
-    ↓                     ↓
- 3. 回到步骤 1，带工具结果再次调 LLM
-    ↓
- 4. LLM 返回纯文本 → 输出给用户 ✅
-```
-
-## 快速开始
-
-### 方式一：GitHub Codespaces（推荐，浏览器即用）
-
-[![Open in Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/theking0912/mini-agent)
-
-点击上方按钮 → 等环境加载完 → 终端里直接运行：
-
-```bash
-export OPENAI_API_KEY='你的API_KEY'
-export OPENAI_BASE_URL='https://api.deepseek.com/v1'
-export LLM_MODEL='deepseek-chat'
-
-python agent.py
-```
-
-### 方式二：本地运行
-
-```bash
-git clone https://github.com/theking0912/mini-agent.git
-cd mini-agent
-pip install httpx duckduckgo-search
-
-# 交互模式
-export OPENAI_API_KEY='你的API_KEY'
-python agent.py
-
-# 或单次查询
-python agent.py "计算 2 的 10 次方"
-```
-
-## 交互命令
-
-进入 REPL 后支持：
-
-| 命令 | 说明 |
+| 版本 | 新增 |
 |------|------|
-| `/tools` | 列出所有可用工具 |
-| `/reset` | 重置对话 |
-| `/debug` | 查看当前上下文消息 |
-| `/help` | 显示帮助 |
-| `/quit` | 退出 |
+| v1 | 调 API，能调用 2-3 个工具 |
+| v2 | 记忆（SQLite 上下文保存） |
+| v3 | 多轮对话 + 工具链编排 |
+| v4 | **MCP 协议支持（动态注册工具）** |
+| v5 | **多模型 Key 适配 + 运行时切换** |
 
-## 学习路线
+## 进程
 
-学完 V1 建议继续：
+```plaintext
+用户输入 → LLM(理解意图) → 调用工具 → LLM(组织回复) → 输出
+                ↑                        |
+                └──── 工具结果回流 ────────┘
+```
 
-| 版本 | 内容 | 学到什么 |
-|------|------|----------|
-| **V1 ✅** | 695 行最小 Agent + 3 个工具 | Tool Calling 原理、API 协议、上下文管理 |
-| **V2** | SQLite 持久化记忆 | 长期记忆、会话管理、向量检索 |
-| **V3** | 工具链编排 | 多步推理、任务分解、结果聚合 |
-| **V4** | MCP 协议支持 | 热插拔工具、标准化协议、动态注册 |
-
-## License
+## 许可证
 
 MIT

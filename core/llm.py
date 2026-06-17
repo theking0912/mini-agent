@@ -1,61 +1,22 @@
 """
 LLM 通信层 — 直接调用 OpenAI 兼容 API，展示底层协议细节
 不依赖 openai SDK，用 httpx 裸调 HTTP 接口，让你看到完整的 API 协议
+
+支持多模型配置：通过 core.config 传入 ModelConfig，动态切换 provider。
 """
+import json
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 import httpx
 
-
-# ── 配置 ──────────────────────────────────────────────────────
-# 从环境变量读取，兼容 OpenAI / DeepSeek / vLLM 等所有兼容接口
-API_KEY = os.environ.get("OPENAI_API_KEY", "")
-BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-MODEL = os.environ.get("LLM_MODEL", "gpt-4o")
+from .config import get_config, ModelConfig
 
 
-# ── 一个完整的 Chat Completion 请求长什么样 ──
-#
-# POST /v1/chat/completions
-# {
-#   "model": "gpt-4o",
-#   "messages": [
-#     {"role": "system", "content": "你是一个助手"},
-#     {"role": "user", "content": "1+1=?"}
-#   ],
-#   "tools": [                    # ← 工具定义，由 tools/registry.py 生成
-#     {
-#       "type": "function",
-#       "function": {
-#         "name": "calculator",
-#         "description": "计算数学表达式",
-#         "parameters": {...}     # JSON Schema 格式
-#       }
-#     }
-#   ],
-#   "tool_choice": "auto"         # 让模型自己决定是否调用工具
-# }
-#
-# 返回：
-# {
-#   "choices": [{
-#     "message": {
-#       "role": "assistant",
-#       "content": "我来帮你计算...",
-#       "tool_calls": [           # ← 如果模型决定调用工具
-#         {
-#           "id": "call_xxx",
-#           "type": "function",
-#           "function": {
-#             "name": "calculator",
-#             "arguments": "{\"expr\": \"1+1\"}"
-#           }
-#         }
-#       ]
-#     }
-#   }]
-# }
+# ── 旧的全局配置（只保留做 fallback，建议用 config/models.json） ──
+_LEGACY_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+_LEGACY_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+_LEGACY_MODEL = os.environ.get("LLM_MODEL", "gpt-4o")
 
 
 @dataclass
@@ -67,14 +28,40 @@ class LLMResponse:
     usage: dict | None    # Token 用量
 
 
+def _get_active_cfg() -> ModelConfig:
+    """
+    获取当前生效的模型配置。
+    优先使用 config/models.json 中的配置，回退到环境变量。
+    """
+    try:
+        return get_config().current_model
+    except Exception:
+        # 如果 config 模块有异常，回退到旧的环境变量
+        return ModelConfig(
+            name="default",
+            api_key=_LEGACY_API_KEY,
+            base_url=_LEGACY_BASE_URL,
+            model=_LEGACY_MODEL,
+            description="环境变量模式",
+        )
+
+
 def chat(
     messages: list[dict],
     tools: list[dict] | None = None,
     temperature: float = 0.7,
+    model_cfg: Optional[ModelConfig] = None,
 ) -> LLMResponse:
     """
     最核心的函数：一次 LLM Chat Completion 调用
     ────────────────────────────────────────────
+    参数：
+      messages    — 对话上下文
+      tools       — 工具定义（可用的工具清单）
+      temperature — 温度参数
+      model_cfg   — 模型配置（可选）。不传则使用 config/models.json 中的当前模型，
+                    或者回退到环境变量 OPENAI_API_KEY / LLM_MODEL / OPENAI_BASE_URL
+    
     参数 raw 到 HTTP 请求的映射：
       messages → body["messages"]    —— 对话上下文
       tools    → body["tools"]       —— 工具定义（可用的工具清单）
@@ -83,15 +70,20 @@ def chat(
       choices[0].message.content     —— 文本回复（不调工具时）
       choices[0].message.tool_calls  —— 工具调用（调工具时）
     """
-    if not API_KEY:
+    # 确定使用哪个模型配置
+    cfg = model_cfg or _get_active_cfg()
+
+    if not cfg.api_key:
         raise ValueError(
-            "请设置 OPENAI_API_KEY 环境变量\n"
-            "例如: export OPENAI_API_KEY='sk-xxx'"
+            f"模型 '{cfg.name}' 未设置 API Key。\n"
+            f"请确保环境变量已设置（config/models.json 引用了 ${cfg.api_key[:20] or '???'}），\n"
+            f"或直接设置 OPENAI_API_KEY 环境变量。\n"
+            f"例如: export {_find_env_var_for(cfg.name)}='sk-xxx'"
         )
 
     # 构建请求体 — 这就是你在 API 文档里看到的那个 JSON
     body: dict[str, Any] = {
-        "model": MODEL,
+        "model": cfg.model,
         "messages": messages,
         "temperature": temperature,
     }
@@ -105,9 +97,9 @@ def chat(
     # 发起 HTTP 调用
     with httpx.Client(timeout=60) as client:
         resp = client.post(
-            f"{BASE_URL}/chat/completions",
+            f"{cfg.base_url}/chat/completions",
             headers={
-                "Authorization": f"Bearer {API_KEY}",
+                "Authorization": f"Bearer {cfg.api_key}",
                 "Content-Type": "application/json",
             },
             json=body,
@@ -123,7 +115,6 @@ def chat(
     tool_calls = []
     if msg.get("tool_calls"):
         for tc in msg["tool_calls"]:
-            import json
             try:
                 args = json.loads(tc["function"]["arguments"])
             except json.JSONDecodeError:
@@ -140,3 +131,17 @@ def chat(
         raw=data,
         usage=data.get("usage"),
     )
+
+
+def _find_env_var_for(model_name: str) -> str:
+    """根据模型名猜测对应的环境变量名（提示用）"""
+    mapping = {
+        "deepseek": "DEEPSEEK_API_KEY",
+        "deepseek-reasoner": "DEEPSEEK_API_KEY",
+        "gpt4o": "OPENAI_API_KEY",
+        "gpt4o-mini": "OPENAI_API_KEY",
+        "claude": "ANTHROPIC_API_KEY",
+        "claude-sonnet": "ANTHROPIC_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+    }
+    return mapping.get(model_name, f"{model_name.upper()}_API_KEY")
