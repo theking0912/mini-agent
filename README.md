@@ -389,9 +389,9 @@ flowchart LR
     end
     
     subgraph Key 来源
-        EV[环境变量\n${DEEPSEEK_API_KEY}]
-        KR[core.keyring\n加密文件 keys.enc]
-        UK[core.user\n用户独立 Key\nPostgreSQL JSONB]
+        EV[环境变量: DEEPSEEK_API_KEY]
+        KR[core.keyring · 加密文件 keys.enc]
+        UK[core.user · 用户独立 Key · PostgreSQL JSONB]
     end
     
     subgraph 解析层
