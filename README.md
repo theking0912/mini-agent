@@ -277,59 +277,84 @@ flowchart TB
 
 ### Web UI 模式（`server.py`）
 
+**① 整体架构 — 服务拓扑**
+
 ```mermaid
-flowchart TB
-    B[浏览器] -->|GET /| S[server.py FastAPI]
-    B -->|GET /auth| AUTH[web/auth.html]
-    B -->|POST /api/*| API[API 路由]
-    
-    subgraph FastAPI 服务
-        S
-        API
-        DB[core.db]
-        USER[core.user]
-        VER[core.verify]
-        EMAIL[core.email]
+flowchart LR
+    subgraph 浏览器
+        UI[HTML/CSS/JS]
     end
-    
-    subgraph 外部服务
+    subgraph FastAPI
+        S[server.py]
+        API[API 路由]
+        STATIC[静态页面]
+    end
+    subgraph 存储
         PG[(PostgreSQL)]
         RD[(Redis)]
         MI[(MinIO)]
-        LLM_API[LLM API]
     end
-    
-    S -->|startup| DB
-    DB --> PG
-    DB --> RD
-    
-    subgraph 注册登录流程
-        API -->|/api/auth/register| VER
-        API -->|/api/auth/register| EMAIL
-        VER --> RD
-        API -->|/api/auth/verify| USER
-        USER --> PG
-        API -->|/api/auth/login| USER
-        USER --> PG
+    subgraph 外部
+        LLM[LLM API]
     end
-    
-    subgraph 聊天流程
-        API -->|/api/chat| CFG[core.config.get_config]
-        CFG --> MD[config/models.json]
-        API -->|获取用户 Key| USER
-        API --> SSE[SSE _stream_chat]
-        SSE --> CTX[core.context.Context]
-        SSE --> LLM[core.llm.chat]
-        LLM --> LLM_API
-        SSE --> REG[tools.registry.execute]
-        REG --> TOOLS[tools.calculator/web_search/file_tool]
+
+    UI -->|GET /| STATIC
+    UI -->|GET /auth| STATIC
+    UI -->|POST /api/*| API
+    S -->|startup| PG
+    S -->|startup| RD
+    S --- API
+    S --- STATIC
+```
+
+**② 注册登录流程**
+
+```mermaid
+flowchart LR
+    subgraph 注册
+        REG1[POST /api/auth/register] --> VER[core.verify 生成6位码]
+        REG1 --> EMAIL[core.email 发送邮件]
+        VER --> RD1[(Redis 存 120s)]
+        RD2[(Redis 暂存密码)] --> REG2[POST /api/auth/verify]
+        VER2[core.verify 匹配+删除] --> USER1[core.user.create_user]
+        USER1 --> PG1[(PostgreSQL)]
     end
-    
-    subgraph 头像流程
-        API -->|/api/avatar/upload| MI
-        API -->|/api/avatar/:id| MI
-        API -->|记录路径| USER
-        USER --> PG
+    subgraph 登录
+        LOGIN[POST /api/auth/login] --> USR[core.user.get_user_by_email]
+        USR --> PW[验证密码 SHA256]
+        PW --> TOK[生成 token 存入 DB]
+        TOK --> PG2[(PostgreSQL)]
+    end
+```
+
+**③ 聊天 + 工具体系**
+
+```mermaid
+flowchart LR
+    CHAT[POST /api/chat] --> KEY{有 Key?}
+    KEY -->|用户 Key| SSE[_stream_chat SSE 流式]
+    KEY -->|全局 Key| SSE
+    KEY -->|无 Key| NOKEY[SSE 返回 no_key 事件]
+
+    SSE --> CTX[core.context 追加消息]
+    CTX --> LLM[core.llm.chat]
+    LLM --> APIIN[LLM API /v1/chat/completions]
+
+    LLM --> LOOP{返回 tool_calls?}
+    LOOP -->|是| REG[tools.registry.execute]
+    REG --> CAL[tools.calculator]
+    REG --> WEB[tools.web_search]
+    REG --> FIL[tools.file_tool]
+    REG --> CTX2[context.add_tool_result]
+    CTX2 --> LLM
+
+    LOOP -->|否| TOKEN[event: token 逐词]
+    LOOP -->|否| DONE[event: done]
+
+    subgraph 头像管理
+        UPLOAD[POST /api/avatar/upload] --> MI[(MinIO)]
+        AVATAR[GET /api/avatar/:id] --> MI
+        UPLOAD --> USERDB[记录路径到 PostgreSQL]
     end
 ```
 
