@@ -2,8 +2,8 @@
 验证码模块 — 基于 Redis，2 分钟过期
 ====================================
 """
-import secrets
 import logging
+import secrets
 
 from core.db import get_redis
 

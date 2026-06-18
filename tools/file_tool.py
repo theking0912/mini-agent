@@ -1,7 +1,6 @@
 """
 文件读取工具 — 安全读取文件内容
 """
-import os
 from pathlib import Path
 
 from .registry import register

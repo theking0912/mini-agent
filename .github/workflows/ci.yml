@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,20 +17,53 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Ruff check
+        run: ruff check .
+
+      - name: Ruff format check
+        run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
-        run: pip install httpx duckduckgo-search
-
-      - name: Syntax check
         run: |
-          python -m py_compile agent.py
-          python -m py_compile core/llm.py
-          python -m py_compile core/context.py
-          python -m py_compile core/tool_runner.py
-          python -m py_compile tools/registry.py
-          python -m py_compile tools/calculator.py
-          python -m py_compile tools/file_tool.py
-          python -m py_compile tools/web_search.py
-          echo "All files pass syntax check"
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
 
-      - name: Import & registry test
-        run: python scripts/test_imports.py
+      - name: Run tests with coverage
+        run: pytest --cov=. --cov-report=term --cov-report=xml -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: ${{ matrix.python-version == '3.13' }}
+        with:
+          fail_ci_if_error: false
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -t mini-agent .
+
+      - name: Verify tools in container
+        run: docker run --rm mini-agent python scripts/test_imports.py

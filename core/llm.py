@@ -7,11 +7,11 @@ LLM 通信层 — 直接调用 OpenAI 兼容 API，展示底层协议细节
 import json
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
+
 import httpx
 
-from .config import get_config, ModelConfig
-
+from .config import ModelConfig, get_config
 
 # ── 旧的全局配置（只保留做 fallback，建议用 config/models.json） ──
 _LEGACY_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -50,7 +50,7 @@ def chat(
     messages: list[dict],
     tools: list[dict] | None = None,
     temperature: float = 0.7,
-    model_cfg: Optional[ModelConfig] = None,
+    model_cfg: ModelConfig | None = None,
     api_key_override: str | None = None,
 ) -> LLMResponse:
     """

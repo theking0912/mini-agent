@@ -77,7 +77,7 @@ async def send_verification_code(email: str, code: str, purpose: str = "register
     """
     if not is_configured():
         logger.info(f"📧 [DEV] 验证码 for {email} (purpose={purpose}): {code}")
-        logger.info(f"   SMTP 未配置，验证码仅打印到日志")
+        logger.info("   SMTP 未配置，验证码仅打印到日志")
         return True
 
     subject = {

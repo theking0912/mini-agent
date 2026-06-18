@@ -1,0 +1,21 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# Secrets
+.env
+
+# Tests (not needed in production image)
+tests/
+scripts/
+
+# IDE
+.vscode/
+.idea/

@@ -13,6 +13,7 @@
 最大递归层数（MAX_TURNS）防止无限循环。
 """
 import json
+
 from core import llm
 from core.context import Context
 from tools import registry
@@ -37,7 +38,7 @@ def run_agent(context: Context, user_input: str) -> str:
 
     # 2. 获取可用工具的定义
     tools = registry.get_schemas()
-    
+
     # 3. 工具调用环
     turn = 0
     while turn < MAX_TURNS:
@@ -65,7 +66,7 @@ def run_agent(context: Context, user_input: str) -> str:
         for tc in response.tool_calls:
             name = tc["name"]
             args = tc["arguments"]
-            
+
             print(f"\n  🔧 调用工具: {name}({json.dumps(args, ensure_ascii=False)})")
             result = registry.execute(name, args)
             print(f"  ✅ 结果: {result[:200]}")

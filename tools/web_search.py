@@ -33,7 +33,7 @@ def _search_ddg(query: str, max_results: int = 5) -> list[dict]:
 )
 def web_search(args: dict) -> str:
     query = args["query"]
-    
+
     if not HAS_DDGS:
         return "❌ 未安装 duckduckgo_search 库，请运行: pip install duckduckgo-search"
 
@@ -41,7 +41,7 @@ def web_search(args: dict) -> str:
         results = _search_ddg(query)
         if not results:
             return f"🔍 搜索 '{query}' 没有找到结果"
-        
+
         lines = [f"🔍 搜索 '{query}' 的结果：\n"]
         for i, r in enumerate(results[:5], 1):
             title = r.get("title", "无标题")

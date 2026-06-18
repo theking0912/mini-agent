@@ -8,8 +8,8 @@ import secrets
 import psycopg2
 import psycopg2.extras
 
-from core.db import get_conn_sync
 from core import keyring
+from core.db import get_conn_sync
 
 
 # ── 密码处理 ──────────────────────────────────────────────────

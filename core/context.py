@@ -3,7 +3,6 @@
 """
 from dataclasses import dataclass, field
 
-
 SYSTEM_PROMPT = """你是一个智能助手，可以通过调用工具来帮助用户。
 你的能力：
 - 计算数学表达式

@@ -2,25 +2,26 @@
 Mini Agent Web UI — FastAPI 服务
 =================================
 """
-import sys
-import os
-import json
 import asyncio
+import json
+import sys
+import urllib.request as _urllib
+from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import AsyncGenerator
-from datetime import datetime, timezone
 
-from fastapi import FastAPI, Request, File, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Response
 import uvicorn
+from fastapi import FastAPI, File, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+
+from core import email as email_svc
+from core import user, verify
 
 # Mini Agent 核心
-from core.config import get_config, reload_config
+from core.config import get_config
 from core.context import Context
-from core import user, email as email_svc, verify
-from core.db import init_db, get_redis
+from core.db import get_redis, init_db
 from tools import registry
-import urllib.request as _urllib
 
 # Redis 客户端
 redis_client = get_redis()
@@ -49,7 +50,8 @@ def _get_user(request: Request) -> dict | None:
 
 def _minio_put(path: str, data: bytes, content_type: str) -> bool:
     """上传文件到 MinIO（兼容 AWS S3 API）"""
-    import base64, hashlib, hmac
+    import hashlib
+    import hmac
     from datetime import datetime as dt
 
     bucket, obj = path.split("/", 1)
@@ -113,7 +115,8 @@ def _minio_put(path: str, data: bytes, content_type: str) -> bool:
 
 def _minio_delete(path: str) -> bool:
     """删除 MinIO 对象（忽略 404）"""
-    import hashlib, hmac
+    import hashlib
+    import hmac
     from datetime import datetime as dt
 
     bucket, obj = path.split("/", 1)
@@ -311,7 +314,7 @@ async def auth_register(request: Request):
         # 注意：这里存原始密码，create_user 内部会做哈希
         redis_client.hset(f"pending_user:{email}", mapping={
             "password": password,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         })
         redis_client.expire(f"pending_user:{email}", 600)
 

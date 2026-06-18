@@ -32,7 +32,7 @@ def _safe_eval(expr: str) -> float:
 
     # 解析为 AST
     tree = ast.parse(expr, mode="eval")
-    
+
     def _eval(node):
         if isinstance(node, ast.Constant):
             if isinstance(node.value, (int, float)):
@@ -49,7 +49,7 @@ def _safe_eval(expr: str) -> float:
                 raise ValueError(f"不支持的操作符: {type(node.op).__name__}")
             return op(_eval(node.operand))
         raise ValueError(f"不支持的语法: {type(node).__name__}")
-    
+
     return _eval(tree.body)
 
 

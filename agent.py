@@ -27,14 +27,13 @@ Mini Agent — 从零搭建的最小化 AI Agent 框架
         file_tool.py       ← 文件读取工具
         web_search.py      ← 网络搜索工具
 """
-import os
-import sys
 import argparse
+
+from core import keyring
+from core.config import get_config, reload_config
 from core.context import Context
 from core.tool_runner import run_agent
 from tools import registry
-from core.config import get_config, reload_config
-from core import keyring
 
 
 def interactive_mode(initial_model: str | None = None):
@@ -160,8 +159,8 @@ def _show_model_menu(cfg):
         key_status = "✅" if m.api_key else "❌ 无 Key"
         print(f"  {'▶' if name == current else ' '} {name:20s} {m.description:25s} [{m.model}] {key_status}{marker}")
     print()
-    print(f"  输入 /model NAME 切换（例如 /model deepseek）")
-    print(f"  输入 /reload 重新加载配置文件")
+    print("  输入 /model NAME 切换（例如 /model deepseek）")
+    print("  输入 /reload 重新加载配置文件")
     print()
 
 
@@ -190,21 +189,20 @@ def _show_key_menu():
         for name in kr_keys:
             print(f"    • {name}")
         print()
-        print(f"  命令:")
-        print(f"    /key set <模型名> <API Key>   — 加密保存 Key")
-        print(f"    /key remove <模型名>          — 删除指定 Key")
-        print(f"    /key clear                    — 清除所有 Key")
+        print("  命令:")
+        print("    /key set <模型名> <API Key>   — 加密保存 Key")
+        print("    /key remove <模型名>          — 删除指定 Key")
+        print("    /key clear                    — 清除所有 Key")
     else:
-        print(f"  📭 尚未保存任何 Key")
+        print("  📭 尚未保存任何 Key")
         print()
-        print(f"  用法: /key set deepseek sk-xxxxxxxxxxxxxxxx")
-        print(f"  Key 会被加密存储在 ~/.mini-agent/keys.enc，仅当前机器可解密。")
+        print("  用法: /key set deepseek sk-xxxxxxxxxxxxxxxx")
+        print("  Key 会被加密存储在 ~/.mini-agent/keys.enc，仅当前机器可解密。")
     print()
 
 
 def _handle_key_command(args: str):
     """处理 /key 子命令"""
-    import json
 
     parts = args.split(maxsplit=1)
     if not parts:
@@ -237,7 +235,7 @@ def _handle_key_command(args: str):
         cfg = get_config()
         if model_name not in cfg.models:
             print(f"⚠️  模型 '{model_name}' 不在配置中，将存档但无法直接使用。")
-            yn = input(f"   确认保存? (y/N): ").strip().lower()
+            yn = input("   确认保存? (y/N): ").strip().lower()
             if yn != "y":
                 print("   已取消")
                 return

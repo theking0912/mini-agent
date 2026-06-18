@@ -4,7 +4,6 @@
 1. schema — OpenAI 兼容的 JSON Schema 定义（告诉 LLM 这个工具怎么用）
 2. execute — 实际的 Python 函数（做真正的工作）
 """
-import re
 
 # 工具注册表：{name: {"schema": {...}, "fn": callable}}
 _registry: dict[str, dict] = {}

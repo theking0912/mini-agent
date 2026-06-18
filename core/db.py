@@ -8,8 +8,8 @@
 """
 
 import json
-from pathlib import Path
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import psycopg2
 import psycopg2.extras

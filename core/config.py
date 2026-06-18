@@ -23,9 +23,8 @@
 """
 import os
 import re
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from pathlib import Path
 
 # ── 路径 ──────────────────────────────────────────────────────
 # 配置文件位置：项目根目录下的 config/models.json
@@ -216,7 +215,7 @@ def _legacy_config() -> AppConfig:
 
 # ── 全局单例 ──────────────────────────────────────────────────
 # 模块级缓存，避免每次调用都重新读文件
-_config: Optional[AppConfig] = None
+_config: AppConfig | None = None
 
 
 def get_config() -> AppConfig:

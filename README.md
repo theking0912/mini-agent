@@ -225,16 +225,226 @@ mini-agent/
 
 ---
 
-## 架构演进
+## 架构模式与演进
 
-| 版本 | 新增 |
+Mini Agent 展示了从最简单的"调 API"到完整的多用户 Web 系统的演进过程。以下三个核心模式是理解 AI Agent 的关键。
+
+---
+
+### Tool Calling — 工具调用环
+
+这是 Agent 最基础的执行模式，也是当前 mini-agent 的核心。
+
+**执行原理：**
+
+```mermaid
+flowchart LR
+    IN[用户输入] --> A[Agent 循环\nwhile turn < 5]
+    A --> LLM[LLM API\n/v1/chat/completions]
+    LLM --> D{tool_calls?}
+
+    D -->|是| T1[tools.registry.execute]
+    T1 --> CAL[tools.calculator]
+    T1 --> WEB[tools.web_search]
+    T1 --> FIL[tools.file_tool]
+    T1 --> CTX[context.add_tool_result\n追加 tool-role 消息]
+    CTX --> LLM
+
+    D -->|否| OUT[最终回复]
+```
+
+**关键代码链路：**
+
+```
+tool_runner.py (CLI) / server.py (Web)
+  └─ registry.get_schemas()      # 生成 JSON Schema 给 LLM 看
+  └─ llm.chat(messages, tools)   # LLM 自主决定是否调工具
+  └─ registry.execute(name, args) # 执行找到的函数
+  └─ context.add_tool_result()   # 结果回注上下文
+```
+
+**核心原则：**
+
+| 原则 | 说明 |
 |------|------|
-| v1 | 调 API，能调用 2-3 个工具 |
-| v2 | 记忆（SQLite 上下文保存） |
-| v3 | 多轮对话 + 工具链编排 |
-| v4 | MCP 协议支持（动态注册工具） |
-| v5 | **多模型 Key 适配 + 运行时切换** |
-| v6 | **Web UI + 多用户 + 头像管理** |
+| **让 LLM 决定** | `tool_choice: "auto"` — 不强制调工具 |
+| **工具是纯函数** | 每个工具接收 `dict` 参数，返回 `str` 结果 |
+| **结果环回** | 工具结果以 `tool-role` 消息追加到上下文，LLM 再据此组织回复 |
+| **安全边界** | calculator 用 AST 白名单（非 eval），file_tool 用路径黑名单 |
+
+**当前实现 (v6)：** `tools/registry.py` + `core/tool_runner.py`，支持 3 个工具，最大 5 轮循环。
+
+---
+
+### RAG — 检索增强生成
+
+RAG 让 Agent 能访问私有知识库，而不需要重新训练模型。
+
+**架构设计：**
+
+```mermaid
+flowchart TB
+    subgraph 知识注入
+        DOC[文档/PDF/Markdown] --> CHUNK[文本分块\nchunk_size=512]
+        CHUNK --> EMB[Embedding 模型\n转为向量]
+        EMB --> VS[(向量数据库)]
+    end
+
+    subgraph 查询阶段
+        Q[用户问题] --> QEMB[Embedding 查询]
+        QEMB --> VS
+        VS --> RET[检索 Top-K 相关片段]
+    end
+
+    subgraph 生成阶段
+        RET --> PROMPT[增强 Prompt\n上下文 + 检索结果]
+        PROMPT --> LLM2[LLM 生成回答]
+    end
+```
+
+**在 mini-agent 中集成 RAG 的方式：**
+
+```
+core/rag.py (新增模块)
+  ├── DocumentChunker    — 文本分块器
+  ├── VectorStore        — 向量存储抽象（支持 Chroma / FAISS / PGVector）
+  └── Retriever          — 检索器（embedding + 相似度搜索）
+
+tools/retrieval.py (新增工具)
+  └── @register("retrieve_knowledge", ...)
+      └── 调用 rag.Retriever.search(query) → 返回相关片段
+```
+
+**关键决策点：**
+
+| 决策 | 选项 | 推荐（轻量级） |
+|------|------|----------------|
+| Embedding 模型 | OpenAI / local / 本地 API | 用 LLM 同厂的 embedding API |
+| 向量数据库 | Chroma / FAISS / PGVector / Milvus | Chroma（零依赖，文件存储） |
+| 分块策略 | 固定大小 / 语义分块 | 512 tokens, 128 overlap |
+| 注入方式 | Tool / Pre-prompt / 路由 | Tool 方式最灵活 |
+
+**数据流：**
+
+```
+用户提问 "什么是 RAG？"
+  → LLM 决定调用 retrieve_knowledge(query="RAG 定义")
+  → 工具内部：query → embedding → 向量检索 → 返回 Top-3 片段
+  → 工具结果注入上下文
+  → LLM 根据检索结果 + 自身知识生成回答
+```
+
+**TODO 实现指引：**
+
+```
+# 1. 安装依赖
+pip install chromadb sentence-transformers
+
+# 2. 新建 core/rag.py — 分块 + 检索逻辑
+# 3. 新建 tools/retrieval.py — @register 工具
+# 4. 启动时加载知识库到向量库
+# 5. 用户可选在哪类对话中启用 RAG
+```
+
+---
+
+### Task Planning — 任务规划
+
+当用户提出复杂请求（如"分析这份报告并生成图表"），需要 Agent 将其分解为多个子任务，有序执行。
+
+**架构设计：**
+
+```mermaid
+flowchart TB
+    REQ[复杂任务] --> PLAN[规划阶段]
+    PLAN --> DEP{可拆分?}
+
+    DEP -->|是| SUB1[子任务 1\n提取数据]
+    DEP -->|是| SUB2[子任务 2\n分析结果]
+    DEP -->|是| SUB3[子任务 3\n生成图表]
+
+    SUB1 --> EXEC[执行阶段]
+    SUB2 --> EXEC
+    SUB3 --> EXEC
+
+    EXEC --> CHECK{全部完成?}
+    CHECK -->|否| FIX[修正错误子任务]
+    FIX --> EXEC
+    CHECK -->|是| SUM[汇总阶段]
+    SUM --> OUT[最终输出]
+```
+
+**三种规划模式对比：**
+
+| 模式 | 说明 | 适用场景 | 复杂度 |
+|------|------|---------|--------|
+| **ReAct** | 边想边做：Thought → Action → Observation → Thought | 简单任务链 | 低 |
+| **Plan & Execute** | 先规划再执行：一次规划，顺序执行 | 确定性多步骤任务 | 中 |
+| **Tree of Thought** | 多路径探索：同时探索多个方案，择优 | 创意/推理密集型 | 高 |
+
+**在 mini-agent 中的实现方案：**
+
+```python
+# 方案一：Prompt 驱动（无需改代码）
+# 在 system prompt 中加入规划指令
+SYSTEM_PROMPT = """你是一个智能助手。
+对于复杂任务，请按以下步骤：
+1. 分解任务为子步骤
+2. 逐一执行每个子步骤
+3. 汇总结果
+
+例如：请先调用 plan 工具列出子任务，再逐一执行。"""
+
+# 方案二：新增 Plan & Execute 模块
+core/planner.py
+  └── plan(task) → list[subtask]     # LLM 生成子任务列表
+  └── execute_plan(subtasks) → str   # 顺序执行每个子任务
+  └── report(results) → str          # 汇总输出
+```
+
+**ReAct 模式的上下文结构：**
+
+```
+messages = [
+  {"role": "system", "content": "..."},
+  {"role": "user",   "content": "分析上月销售数据"},
+  {"role": "assistant", "content": "让我先读取数据文件"},
+  {"role": "assistant", "tool_calls": [read_file(...)]},
+  {"role": "tool",   "content": "文件内容..."},
+  {"role": "assistant", "content": "数据已读取，接下来计算增长率"},
+  {"role": "assistant", "tool_calls": [calculator(...)]},
+  {"role": "tool",   "content": "增长率为 15.3%"},
+  {"role": "assistant", "content": "上月销售增长率 15.3%，趋势向好..."},
+]
+```
+
+**演进路线图：**
+
+| 版本 | 新增能力 | 代码量估 |
+|------|---------|---------|
+| v1 | 调 API，能调用 2-3 个工具 | ~300 行 |
+| v2 | 上下文记忆（SQLite） | +100 行 |
+| v3 | 多轮对话 + 工具链编排 | +150 行 |
+| v4 | MCP 协议支持（动态注册工具） | +300 行 |
+| v5 | **多模型 Key 适配 + 运行时切换** | +200 行 |
+| v6 | **Web UI + 多用户 + 头像管理** | +800 行 |
+| v7 | **RAG 知识库检索** | +400 行 |
+| v8 | **Task Planning 任务规划** | +350 行 |
+| v9 | **记忆持久化 + 跨会话上下文** | +250 行 |
+| v10 | **多 Agent 协作 + 任务委派** | +500 行 |
+
+---
+
+### 三种模式的对比
+
+| 维度 | Tool Calling | RAG | Task Planning |
+|------|-------------|-----|---------------|
+| **核心问题** | 如何执行动作 | 如何获取知识 | 如何分解任务 |
+| **关键组件** | Registry + Executor | Embedding + Vector DB | Planner + Executor |
+| **依赖** | 无 | embedding 模型 + 向量库 | 无（纯 prompt） |
+| **当前状态** | ✅ 已实现 | 🔜 计划中 | 🔜 计划中 |
+| **实现难度** | ⭐ | ⭐⭐ | ⭐⭐ |
+| **收益** | Agent 能操作外部工具 | Agent 能访问私域知识 | Agent 能处理复杂任务 |
 
 ---
 
