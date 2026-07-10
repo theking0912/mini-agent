@@ -28,12 +28,13 @@ def read_file(args: dict) -> str:
     path = args["path"]
     max_chars = args.get("max_chars", 2000)
 
-    # 安全检查：不允许读取 .env / .git 等敏感文件
+    # 安全检查：白名单模式 — 只允许读取项目目录下的文件
     path_obj = Path(path).resolve()
-    forbidden = [".env", ".git", "id_rsa", ".ssh", "config.yaml", ".hermes"]
-    for f in forbidden:
-        if f in str(path_obj):
-            return f"❌ 安全限制：不允许读取包含 '{f}' 的文件"
+    project_root = Path(__file__).resolve().parent.parent
+    try:
+        path_obj.relative_to(project_root)
+    except ValueError:
+        return f"❌ 安全限制：只允许读取项目目录内的文件（{project_root}）"
 
     if not path_obj.exists():
         return f"❌ 文件不存在: {path}"

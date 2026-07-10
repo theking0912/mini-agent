@@ -1,22 +1,19 @@
 """
 LLM 通信层 — 直接调用 OpenAI 兼容 API，展示底层协议细节
-不依赖 openai SDK，用 httpx 裸调 HTTP 接口，让你看到完整的 API 协议
+==========================================================
 
+异步版：使用 httpx.AsyncClient，不阻塞 FastAPI 事件循环。
+
+不依赖 openai SDK，用 httpx 裸调 HTTP 接口，让你看到完整的 API 协议。
 支持多模型配置：通过 core.config 传入 ModelConfig，动态切换 provider。
 """
 import json
-import os
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from .config import ModelConfig, get_config
-
-# ── 旧的全局配置（只保留做 fallback，建议用 config/models.json） ──
-_LEGACY_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-_LEGACY_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-_LEGACY_MODEL = os.environ.get("LLM_MODEL", "gpt-4o")
 
 
 @dataclass
@@ -29,24 +26,11 @@ class LLMResponse:
 
 
 def _get_active_cfg() -> ModelConfig:
-    """
-    获取当前生效的模型配置。
-    优先使用 config/models.json 中的配置，回退到环境变量。
-    """
-    try:
-        return get_config().current_model
-    except Exception:
-        # 如果 config 模块有异常，回退到旧的环境变量
-        return ModelConfig(
-            name="default",
-            api_key=_LEGACY_API_KEY,
-            base_url=_LEGACY_BASE_URL,
-            model=_LEGACY_MODEL,
-            description="环境变量模式",
-        )
+    """获取当前生效的模型配置。"""
+    return get_config().current_model
 
 
-def chat(
+async def chat_async(
     messages: list[dict],
     tools: list[dict] | None = None,
     temperature: float = 0.7,
@@ -54,7 +38,7 @@ def chat(
     api_key_override: str | None = None,
 ) -> LLMResponse:
     """
-    最核心的函数：一次 LLM Chat Completion 调用
+    最核心的函数：一次 LLM Chat Completion 调用（异步）
     ────────────────────────────────────────────
     参数：
       messages    — 对话上下文
@@ -62,11 +46,11 @@ def chat(
       temperature — 温度参数
       model_cfg   — 模型配置（可选）
       api_key_override — 覆盖 API Key（用于用户独立 Key 的场景）
-    
+
     参数 raw 到 HTTP 请求的映射：
       messages → body["messages"]    —— 对话上下文
       tools    → body["tools"]       —— 工具定义（可用的工具清单）
-    
+
     返回值解析：
       choices[0].message.content     —— 文本回复（不调工具时）
       choices[0].message.tool_calls  —— 工具调用（调工具时）
@@ -95,9 +79,9 @@ def chat(
         body["tools"] = tools
         body["tool_choice"] = "auto"  # 让模型自主决定是否调用工具
 
-    # 发起 HTTP 调用
-    with httpx.Client(timeout=60) as client:
-        resp = client.post(
+    # 异步发起 HTTP 调用
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
             f"{cfg.base_url}/chat/completions",
             headers={
                 "Authorization": f"Bearer {effective_key}",
@@ -132,6 +116,27 @@ def chat(
         raw=data,
         usage=data.get("usage"),
     )
+
+
+# ── 保留同步版本用于 CLI ──────────────────────────────────────
+
+def chat(
+    messages: list[dict],
+    tools: list[dict] | None = None,
+    temperature: float = 0.7,
+    model_cfg: ModelConfig | None = None,
+    api_key_override: str | None = None,
+) -> LLMResponse:
+    """
+    同步版 LLM Chat Completion（供 CLI agent.py 使用）
+    内部调用异步版，用 asyncio.run 同步执行。
+    """
+    import asyncio
+    return asyncio.run(chat_async(
+        messages=messages, tools=tools,
+        temperature=temperature, model_cfg=model_cfg,
+        api_key_override=api_key_override,
+    ))
 
 
 def _find_env_var_for(model_name: str) -> str:

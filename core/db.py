@@ -4,16 +4,14 @@
 配置来源：config/db.json（和环境变量完全脱钩）
 
 用法：
-    from core.db import get_conn, get_redis, init_db
+    from core.db import get_conn_sync, get_redis, init_db
 """
 
 import json
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
-import psycopg2.pool
 import redis as redis_module
 
 # ── 配置加载 ──────────────────────────────────────────────────
@@ -45,37 +43,7 @@ _redis_client = redis_module.Redis(
 print(f"[DB] PG: {PG_HOST}:{PG_PORT}/{PG_DATABASE}")
 print(f"[DB] Redis: {_redis_cfg['host']}:{_redis_cfg['port']}")
 
-# ── PostgreSQL 连接池 ────────────────────────────────────────
-_pool = None
-
-
-def get_pool() -> psycopg2.pool.ThreadedConnectionPool:
-    global _pool
-    if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(
-            minconn=1, maxconn=10,
-            host=PG_HOST, port=PG_PORT,
-            user=PG_USER, password=PG_PASSWORD,
-            dbname=PG_DATABASE,
-        )
-    return _pool
-
-
-@asynccontextmanager
-async def get_conn():
-    """获取数据库连接（异步上下文管理器）"""
-    pool = get_pool()
-    conn = pool.getconn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        pool.putconn(conn)
-
-
+# ── PostgreSQL 连接 ──────────────────────────────────────────
 def get_conn_sync():
     """获取同步数据库连接"""
     return psycopg2.connect(
@@ -125,6 +93,61 @@ def init_db():
         print("[DB] 已移除旧 verification_codes 表（验证码已迁移到 Redis）")
     except Exception:
         pass
+
+    # ── 阅读器：书架 ──────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS book_collections (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            icon TEXT DEFAULT '📕',
+            sort_order INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    # ── 阅读器：文档 ──────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS documents (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            collection_id UUID REFERENCES book_collections(id) ON DELETE SET NULL,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            url TEXT,
+            source_type TEXT DEFAULT 'web',
+            total_chars INTEGER DEFAULT 0,
+            total_sections INTEGER DEFAULT 0,
+            sections_done INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'analyzed',
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+    # ── 阅读器：段落 ──────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sections (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            sec_index INTEGER NOT NULL,
+            paragraph_index INTEGER NOT NULL,
+            title TEXT DEFAULT '',
+            html_content_key TEXT DEFAULT '',
+            translated_html_key TEXT DEFAULT '',
+            text_content TEXT DEFAULT '',
+            skip_translate BOOLEAN DEFAULT FALSE,
+            status TEXT DEFAULT 'wait',
+            char_count INTEGER DEFAULT 0,
+            UNIQUE(document_id, sec_index, paragraph_index)
+        )
+    """)
+    # 创建 sections 索引
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_sections_doc
+        ON sections(document_id, sec_index, paragraph_index)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_documents_user
+        ON documents(user_id, collection_id)
+    """)
 
     cur.close()
     conn.close()

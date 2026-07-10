@@ -9,3 +9,6 @@ python-multipart>=0.0.12  # 文件上传解析
 # 用户注册
 psycopg2-binary>=2.9.0
 redis>=5.0.0
+
+# 网络搜索（无需 API Key）
+ddgs>=9.0.0

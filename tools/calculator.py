@@ -1,5 +1,5 @@
 """
-计...器工具 — 安全计算数学表达式
+计算器工具 — 安全计算数学表达式
 """
 import ast
 import operator

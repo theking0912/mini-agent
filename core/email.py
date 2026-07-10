@@ -6,24 +6,22 @@ SMTP 配置来源：config/db.json（和环境变量完全脱钩）
 未配置 SMTP 时，邮件会打印到日志方便开发测试。
 """
 
-import json
 import logging
-from pathlib import Path
+
+from core.db import _cfg
 
 logger = logging.getLogger("mini-agent.email")
 
-# ── SMTP 配置（从 config/db.json 加载）─────────────────────────
-_MAIL_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "db.json"
+# ── SMTP 配置（从 core.db._cfg 加载，与 db.py 共享配置）─────────
 try:
-    with open(_MAIL_CONFIG_PATH, encoding="utf-8") as _f:
-        _mail_cfg = json.load(_f)["email"]
+    _mail_cfg = _cfg["email"]
     SMTP_HOST = _mail_cfg["host"]
     SMTP_PORT = _mail_cfg["port"]
     SMTP_USER = _mail_cfg["user"]
     SMTP_PASSWORD = _mail_cfg["password"]
     FROM_ADDR = _mail_cfg.get("from_addr", SMTP_USER)
 except Exception as _e:
-    logger.warning(f"无法加载 {_MAIL_CONFIG_PATH}: {_e}")
+    logger.warning(f"无法加载 SMTP 配置: {_e}")
     SMTP_HOST = ""
     SMTP_PORT = 465
     SMTP_USER = ""

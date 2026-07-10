@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 阅读器 - Mini Agent</title>
+<style>
+:root {
+  --bg: #0f0f13;
+  --surface: #1a1a24;
+  --surface2: #252535;
+  --surface3: #2e2e42;
+  --border: #2e2e42;
+  --text: #e4e4ed;
+  --text2: #9090a8;
+  --text3: #63637a;
+  --primary: #6c5ce7;
+  --primary-dim: #4834d4;
+  --success: #00b894;
+  --warn: #fdcb6e;
+  --error: #e17055;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Header ── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  height: 48px;
+}
+header h1 { font-size: 15px; font-weight: 600; }
+header h1 span { color: var(--primary); }
+header .nav { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+header .nav a { color: var(--text2); text-decoration: none; font-size: 12px; }
+header .nav a:hover { color: var(--primary); }
+header .nav .user { color: var(--text3); font-size: 11px; }
+
+/* ── Body layout ── */
+.body-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Left: Bookshelf ── */
+.sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-top {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-top .url-row { display: flex; gap: 6px; }
+.sidebar-top .url-row input {
+  flex: 1;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  font-size: 12px;
+  outline: none;
+  min-width: 0;
+}
+.sidebar-top .url-row input:focus { border-color: var(--primary); }
+.sidebar-top .url-row .btn {
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--primary-dim); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-outline {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover { background: var(--surface2); }
+.btn-sm { padding: 5px 8px; font-size: 11px; }
+.btn-xs { padding: 3px 6px; font-size: 10px; }
+
+/* ── Collection list ── */
+.collection-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.collection-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background .1s;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+.collection-header:hover { background: var(--surface2); }
+.collection-header .arrow { color: var(--text3); font-size: 10px; width: 14px; }
+.collection-header .icon { flex-shrink: 0; }
+.collection-header .name { flex: 1; min-width: 0; }
+.collection-header .count { color: var(--text3); font-size: 10px; }
+.collection-header .actions { display: none; gap: 4px; }
+.collection-header:hover .actions { display: flex; }
+
+/* ── Document items ── */
+.doc-items { display: none; }
+.doc-items.open { display: block; }
+.doc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 32px;
+  cursor: pointer;
+  transition: background .1s;
+  font-size: 12px;
+  border-left: 3px solid transparent;
+}
+.doc-item:hover { background: var(--surface2); }
+.doc-item.active {
+  background: rgba(108,92,231,.12);
+  border-left-color: var(--primary);
+}
+.doc-item .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-item .badge { font-size: 10px; flex-shrink: 0; }
+.doc-item .badge.analyzed { color: var(--text3); }
+.doc-item .badge.partial { color: var(--warn); }
+.doc-item .badge.complete { color: var(--success); }
+.doc-item .char-count { color: var(--text3); font-size: 10px; flex-shrink: 0; }
+
+/* ── Empty sidebar ── */
+.sidebar-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text3);
+  gap: 4px;
+  font-size: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* ── Main area ── */
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.main-header {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 42px;
+}
+.main-header .doc-title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.main-header .actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.main-header .actions .btn { padding: 5px 10px; border: none; border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; font-weight: 500; }
+.main-header .view-toggle { display: flex; gap: 2px; }
+.main-header .view-toggle .btn {
+  background: transparent;
+  color: var(--text3);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-size: 11px;
+}
+.main-header .view-toggle .btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+.main-header .view-toggle .btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.main-header .view-toggle .btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+/* ── Reader content ── */
+.reader-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 36px;
+  max-width: 960px;
+}
+.reader-content.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Empty state ── */
+.empty-state {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text3);
+  gap: 6px;
+}
+.empty-state .icon { font-size: 48px; opacity: .4; }
+.empty-state p { font-size: 13px; }
+
+/* ── Loading ── */
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 12px;
+}
+.spinner {
+  width: 14px; height: 14px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Message ── */
+.msg {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  display: none;
+  line-height: 1.5;
+  margin: 6px 10px;
+}
+.msg.show { display: block; }
+.msg.error { background: rgba(225,112,85,.15); border: 1px solid var(--error); color: var(--error); }
+.msg.success { background: rgba(0,184,148,.15); border: 1px solid var(--success); color: var(--success); }
+.msg.info { background: rgba(108,92,231,.15); border: 1px solid var(--primary); color: var(--primary); }
+.msg.warn { background: rgba(253,203,110,.15); border: 1px solid var(--warn); color: var(--warn); }
+
+/* ── Progress bar ── */
+.progress-bar {
+  height: 3px;
+  background: var(--surface2);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: none;
+  margin: 0 10px 4px;
+}
+.progress-bar.show { display: block; }
+.progress-bar .fill {
+  height: 100%;
+  background: var(--primary);
+  width: 0%;
+  transition: width .3s ease;
+}
+
+/* ── Section heading ── */
+.section-heading {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 28px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.section-heading:first-child { margin-top: 0; }
+
+/* ── Paragraph block (interleaved view) ── */
+.para-block {
+  margin-bottom: 4px;
+  transition: opacity .15s;
+}
+.para-block.code-block { margin-bottom: 12px; }
+
+/* ── Original text ── */
+.para-orig {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+  padding: 4px 0;
+  position: relative;
+}
+.para-orig .para-index {
+  position: absolute;
+  left: -28px;
+  top: 6px;
+  font-size: 9px;
+  color: var(--text3);
+  font-family: var(--mono);
+  opacity: .5;
+}
+
+/* ── Translated text ── */
+.para-trans {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--success);
+  padding: 4px 12px;
+  margin-bottom: 8px;
+  border-left: 2px solid var(--success);
+  background: rgba(0,184,148,.04);
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── Side-by-side view ── */
+.sbs-container { display: flex; gap: 20px; }
+.sbs-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.sbs-pane .pane-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text3);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.sbs-pane.orig-pane .pane-label { color: var(--text); }
+.sbs-pane.trans-pane .pane-label { color: var(--success); }
+
+/* ── Content styles ── */
+.para-block p, .para-orig p, .para-trans p { margin-bottom: 6px; }
+.para-block h1,.para-block h2,.para-block h3,.para-block h4,
+.para-orig h1,.para-orig h2,.para-orig h3,.para-orig h4,
+.para-trans h1,.para-trans h2,.para-trans h3,.para-trans h4 {
+  color: var(--primary);
+  margin: 12px 0 6px;
+}
+.para-orig h1,.para-orig h2,.para-orig h3,.para-orig h4 { color: var(--text); font-weight: 700; }
+.para-block pre, .para-orig pre, .para-trans pre {
+  background: var(--surface2);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.para-block code, .para-orig code, .para-trans code {
+  background: var(--surface2);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.para-block pre code, .para-orig pre code, .para-trans pre code { background: none; padding: 0; }
+.para-block ul,.para-block ol,.para-orig ul,.para-orig ol,.para-trans ul,.para-trans ol {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+.para-block li,.para-orig li,.para-trans li { margin: 2px 0; }
+.para-block table,.para-orig table,.para-trans table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+.para-block td,.para-block th,.para-orig td,.para-orig th,.para-trans td,.para-trans th {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.para-block th,.para-orig th,.para-trans th { background: var(--surface2); }
+.para-block blockquote,.para-orig blockquote,.para-trans blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 6px 12px;
+  margin: 8px 0;
+  color: var(--text2);
+  background: rgba(108,92,231,.06);
+  border-radius: 0 4px 4px 0;
+}
+.para-block a,.para-orig a,.para-trans a { color: var(--primary); text-decoration: underline; }
+.para-block img,.para-orig img,.para-trans img { max-width: 100%; border-radius: var(--radius-sm); }
+
+/* ── Status badge ── */
+.para-status { font-size: 10px; color: var(--text3); }
+.para-status .wait { color: var(--text3); }
+.para-status .done { color: var(--success); }
+.para-status .error { color: var(--error); }
+.para-status .skip { color: var(--warn); }
+
+/* ── Dialog / modal ── */
+.dialog-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.dialog-overlay.show { display: flex; }
+.dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+}
+.dialog h3 { font-size: 14px; margin-bottom: 12px; }
+.dialog input {
+  width: 100%;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  outline: none;
+  margin-bottom: 10px;
+}
+.dialog input:focus { border-color: var(--primary); }
+.dialog .btn-row { display: flex; gap: 6px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>📚</span> 阅读器</h1>
+  <div class="nav">
+    <span class="user" id="userInfo"></span>
+    <a href="/">← 聊天</a>
+  </div>
+</header>
+
+<div class="body-layout">
+  <!-- Left: Bookshelf -->
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <div class="url-row">
+        <input type="url" id="urlInput" placeholder="https://...">
+        <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeUrl()">📥 导入</button>
+      </div>
+      <div id="sidebarMsg" class="msg"></div>
+    </div>
+    <div class="collection-list" id="collectionList">
+      <div class="sidebar-empty" id="sidebarEmpty">
+        <p>📕 书架为空</p>
+        <p style="font-size:11px;color:var(--text3);margin-top:4px">输入 URL 导入你的第一篇文章</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Reader -->
+  <div class="main-area">
+    <div class="main-header" id="mainHeader" style="display:none">
+      <span class="doc-title" id="docTitle">选择一篇文章</span>
+      <div class="actions">
+        <div class="view-toggle" id="viewToggle">
+          <button class="btn active" data-view="interleaved" onclick="switchView('interleaved')">📄 交错</button>
+          <button class="btn" data-view="sbs" onclick="switchView('sbs')">📑 左右</button>
+        </div>
+        <button class="btn btn-primary btn-sm" id="translateBtn" onclick="startTranslate()" style="display:none">🌐 翻译</button>
+        <button class="btn btn-outline btn-sm" id="deleteDocBtn" onclick="deleteDocument()" style="display:none">🗑</button>
+      </div>
+    </div>
+    <div id="progressBar" class="progress-bar"><div class="fill" id="progressFill"></div></div>
+    <div class="reader-content" id="readerContent">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">📖</div>
+        <p>左侧选择一个文档阅读</p>
+        <p style="font-size:11px;color:var(--text3);margin-top:4px">或在顶部输入 URL 导入新内容</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New Collection Dialog -->
+<div class="dialog-overlay" id="newColDialog">
+  <div class="dialog">
+    <h3>📁 新建书架</h3>
+    <input type="text" id="newColName" placeholder="书架名称" onkeydown="if(event.key==='Enter') confirmNewCol()">
+    <div class="btn-row">
+      <button class="btn btn-outline btn-sm" onclick="closeNewCol()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmNewCol()">创建</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// Auth
+// ══════════════════════════════════════════════════════════════
+const TOKEN = localStorage.getItem('mini_agent_token');
+const USER = JSON.parse(localStorage.getItem('mini_agent_user') || '{}');
+
+if (!TOKEN) {
+  window.location.href = '/auth';
+} else {
+  document.getElementById('userInfo').textContent = USER.email || '';
+}
+
+// ══════════════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════════════
+let collections = [];
+let currentDocId = null;       // UUID of currently viewing document
+let currentDocData = null;     // full data from /api/reader/read/{doc_id}
+let currentView = 'interleaved'; // 'interleaved' or 'sbs'
+let translating = false;
+let abortController = null;
+
+// ══════════════════════════════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════════════════════════════
+function showMsg(el, text, type, duration) {
+  el.textContent = text;
+  el.className = 'msg show ' + type;
+  if (duration && type !== 'error') {
+    setTimeout(() => { el.className = 'msg'; }, duration);
+  }
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function formatChars(n) {
+  if (n < 1000) return n + '字';
+  return (n / 1000).toFixed(1) + 'K字';
+}
+
+function showProgress(pct) {
+  const bar = document.getElementById('progressBar');
+  bar.classList.add('show');
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+function hideProgress() {
+  document.getElementById('progressBar').classList.remove('show');
+  document.getElementById('progressFill').style.width = '0%';
+}
+
+// ══════════════════════════════════════════════════════════════
+// Bookshelf
+// ══════════════════════════════════════════════════════════════
+
+async function loadCollections() {
+  try {
+    const res = await fetch('/api/reader/collections', {
+      headers: {'Authorization': 'Bearer ' + TOKEN}
+    });
+    collections = await res.json();
+    renderCollections();
+  } catch (e) {
+    console.error('Load collections failed:', e);
+  }
+}
+
+function renderCollections() {
+  const list = document.getElementById('collectionList');
+  const empty = document.getElementById('sidebarEmpty');
+
+  if (!collections || collections.length === 0) {
+    list.innerHTML = '';
+    list.appendChild(empty);
+    return;
+  }
+
+  list.innerHTML = '';
+  collections.forEach(col => {
+    // Collection header
+    const header = document.createElement('div');
+    header.className = 'collection-header';
+    header.dataset.colId = col.id;
+    header.innerHTML = `
+      <span class="arrow">▶</span>
+      <span class="icon">${col.icon || '📕'}</span>
+      <span class="name">${escapeHtml(col.name)}</span>
+      <span class="count">${col.doc_count || 0}</span>
+      <span class="actions">
+        <button class="btn btn-xs btn-outline" onclick="showNewDocDialog('${col.id}')" title="导入到此书架">+</button>
+        <button class="btn btn-xs btn-outline" onclick="deleteCollection('${col.id}')" title="删除书架">✕</button>
+      </span>
+    `;
+    header.addEventListener('click', (e) => {
+      // Don't toggle if clicking action buttons
+      if (e.target.tagName === 'BUTTON') return;
+      const container = document.getElementById('docs-' + col.id);
+      const isOpen = container.classList.contains('open');
+      container.classList.toggle('open');
+      header.querySelector('.arrow').textContent = isOpen ? '▶' : '▼';
+    });
+
+    // Document items container
+    const docContainer = document.createElement('div');
+    docContainer.className = 'doc-items';
+    docContainer.id = 'docs-' + col.id;
+    // Load docs on first open
+    loadDocItems(col.id, docContainer, 0);
+
+    list.appendChild(header);
+    list.appendChild(docContainer);
+  });
+}
+
+async function loadDocItems(collectionId, container, retries) {
+  try {
+    const res = await fetch('/api/reader/documents?collection_id=' + encodeURIComponent(collectionId), {
+      headers: {'Authorization': 'Bearer ' + TOKEN}
+    });
+    const docs = await res.json();
+    container.innerHTML = '';
+    if (!docs || docs.length === 0) {
+      container.innerHTML = '<div style="padding:6px 12px 6px 32px;font-size:11px;color:var(--text3)">暂无文档</div>';
+      container.classList.add('open');
+      return;
+    }
+    docs.forEach(doc => {
+      const item = document.createElement('div');
+      item.className = 'doc-item' + (currentDocId === doc.id ? ' active' : '');
+      item.dataset.docId = doc.id;
+      const statusIcon = doc.status === 'complete' ? '✅' : doc.status === 'partial' ? '🔄' : '📄';
+      item.innerHTML = `
+        <span class="title">${escapeHtml(doc.title)}</span>
+        <span class="char-count">${formatChars(doc.total_chars || 0)}</span>
+        <span class="badge ${doc.status}">${statusIcon}</span>
+      `;
+      item.addEventListener('click', () => selectDocument(doc.id));
+      container.appendChild(item);
+    });
+  } catch (e) {
+    if (retries < 3) {
+      setTimeout(() => loadDocItems(collectionId, container, retries + 1), 500);
+    }
+  }
+}
+
+function refreshSidebar() {
+  loadCollections();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Document selection
+// ══════════════════════════════════════════════════════════════
+
+async function selectDocument(docId) {
+  currentDocId = docId;
+  currentDocData = null;
+
+  // Highlight in sidebar
+  document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
+  const item = document.querySelector(`.doc-item[data-doc-id="${docId}"]`);
+  if (item) item.classList.add('active');
+
+  const reader = document.getElementById('readerContent');
+  reader.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>加载文档...</span></div>';
+
+  document.getElementById('translateBtn').style.display = 'none';
+  document.getElementById('deleteDocBtn').style.display = 'none';
+  hideProgress();
+
+  try {
+    const res = await fetch('/api/reader/read/' + encodeURIComponent(docId), {
+      headers: {'Authorization': 'Bearer ' + TOKEN}
+    });
+    const data = await res.json();
+    if (data.error) { showReaderError(data.error); return; }
+
+    currentDocData = data.sections || [];
+    document.getElementById('docTitle').textContent = getDocTitle(docId) || '文档';
+    document.getElementById('mainHeader').style.display = '';
+
+    // Check if translation is needed
+    const hasUntranslated = currentDocData.some(sec =>
+      sec.paragraphs.some(p => p.status === 'wait' && !p.skip_translate)
+    );
+    document.getElementById('translateBtn').style.display = hasUntranslated ? '' : 'none';
+    document.getElementById('deleteDocBtn').style.display = '';
+
+    renderReader();
+  } catch (e) {
+    showReaderError('加载失败: ' + e.message);
+  }
+}
+
+function getDocTitle(docId) {
+  for (const col of collections) {
+    const container = document.getElementById('docs-' + col.id);
+    if (container) {
+      const item = container.querySelector(`.doc-item[data-doc-id="${docId}"]`);
+      if (item) return item.querySelector('.title').textContent;
+    }
+  }
+  return '文档';
+}
+
+function showReaderError(msg) {
+  const reader = document.getElementById('readerContent');
+  reader.innerHTML = `<div class="empty-state"><div class="icon" style="font-size:32px">❌</div><p>${escapeHtml(msg)}</p></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Render reader
+// ══════════════════════════════════════════════════════════════
+
+function renderReader() {
+  if (!currentDocData || currentDocData.length === 0) {
+    document.getElementById('readerContent').innerHTML =
+      '<div class="empty-state"><div class="icon">📄</div><p>文档内容为空</p></div>';
+    return;
+  }
+
+  const reader = document.getElementById('readerContent');
+  reader.innerHTML = '';
+
+  currentDocData.forEach((sec, secIdx) => {
+    // Section heading
+    const heading = document.createElement('div');
+    heading.className = 'section-heading';
+    heading.textContent = sec.title || ('第 ' + (secIdx + 1) + ' 节');
+    reader.appendChild(heading);
+
+    // Paragraphs
+    sec.paragraphs.forEach((para, pIdx) => {
+      const block = document.createElement('div');
+      block.className = 'para-block';
+      block.dataset.secIdx = secIdx;
+      block.dataset.paraIdx = pIdx;
+
+      if (currentView === 'interleaved') {
+        renderInterleaved(block, para, secIdx, pIdx);
+      } else {
+        renderSideBySide(block, para, secIdx, pIdx);
+      }
+
+      reader.appendChild(block);
+    });
+  });
+}
+
+function renderInterleaved(block, para, secIdx, pIdx) {
+  // Skip translate = code block, show just once
+  if (para.skip_translate) {
+    block.classList.add('code-block');
+    block.innerHTML = `
+      <div class="para-orig">${para.orig_html || ''}</div>
+      <div class="para-status"><span class="skip">🔧 代码块</span></div>
+    `;
+    return;
+  }
+
+  const origHtml = para.orig_html || '';
+  const transHtml = para.trans_html || '';
+
+  // Original
+  const origDiv = document.createElement('div');
+  origDiv.className = 'para-orig';
+  origDiv.innerHTML = `<span class="para-index">#${pIdx+1}</span>${origHtml}`;
+  block.appendChild(origDiv);
+
+  // Translation (or placeholder)
+  if (para.status === 'done' && transHtml) {
+    const transDiv = document.createElement('div');
+    transDiv.className = 'para-trans';
+    transDiv.innerHTML = transHtml;
+    block.appendChild(transDiv);
+  } else if (para.status === 'wait') {
+    const transDiv = document.createElement('div');
+    transDiv.className = 'para-trans';
+    transDiv.style.color = 'var(--text3)';
+    transDiv.style.borderLeftColor = 'var(--text3)';
+    transDiv.style.background = 'none';
+    transDiv.textContent = '⏳ 待翻译';
+    block.appendChild(transDiv);
+  } else if (para.status === 'error') {
+    const transDiv = document.createElement('div');
+    transDiv.className = 'para-trans';
+    transDiv.style.color = 'var(--error)';
+    transDiv.style.borderLeftColor = 'var(--error)';
+    transDiv.textContent = '❌ 翻译失败';
+    block.appendChild(transDiv);
+  }
+}
+
+function renderSideBySide(block, para, secIdx, pIdx) {
+  if (para.skip_translate) {
+    block.classList.add('code-block');
+    block.innerHTML = `<div class="para-orig" style="padding:0">${para.orig_html || ''}</div>`;
+    return;
+  }
+
+  const sbs = document.createElement('div');
+  sbs.className = 'sbs-container';
+
+  // Left: original
+  const origPane = document.createElement('div');
+  origPane.className = 'sbs-pane orig-pane';
+  origPane.innerHTML = `<div class="pane-label">#${pIdx+1} 原文</div><div>${para.orig_html || ''}</div>`;
+
+  // Right: translation
+  const transPane = document.createElement('div');
+  transPane.className = 'sbs-pane trans-pane';
+  if (para.status === 'done' && para.trans_html) {
+    transPane.innerHTML = `<div class="pane-label">#${pIdx+1} 译文</div><div>${para.trans_html}</div>`;
+  } else if (para.status === 'wait') {
+    transPane.innerHTML = `<div class="pane-label">#${pIdx+1} 译文</div><div style="color:var(--text3)">⏳ 待翻译</div>`;
+  } else if (para.status === 'error') {
+    transPane.innerHTML = `<div class="pane-label">#${pIdx+1} 译文</div><div style="color:var(--error)">❌ 翻译失败</div>`;
+  }
+
+  sbs.appendChild(origPane);
+  sbs.appendChild(transPane);
+  block.appendChild(sbs);
+}
+
+// ══════════════════════════════════════════════════════════════
+// View toggle
+// ══════════════════════════════════════════════════════════════
+
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('#viewToggle .btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === view);
+  });
+  if (currentDocData) renderReader();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Import (analyze URL)
+// ══════════════════════════════════════════════════════════════
+
+async function analyzeUrl() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) {
+    showMsg(document.getElementById('sidebarMsg'), '请输入 URL', 'error', 3000);
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 分析中...';
+
+  // Ask which collection
+  let targetColId = null;
+  if (collections.length > 0) {
+    // Default to first collection
+    targetColId = collections[0].id;
+  }
+
+  showMsg(document.getElementById('sidebarMsg'), '⏳ 正在抓取并分析页面...', 'info');
+
+  try {
+    const res = await fetch('/api/reader/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
+      body: JSON.stringify({url, collection_id: targetColId}),
+    });
+    const data = await res.json();
+    if (data.error) {
+      showMsg(document.getElementById('sidebarMsg'), '❌ ' + data.error, 'error');
+      return;
+    }
+    showMsg(document.getElementById('sidebarMsg'),
+      `✅ 分析完成：${escapeHtml(data.document.title)} (${formatChars(data.document.total_chars)})`,
+      'success', 4000);
+    document.getElementById('urlInput').value = '';
+    // Refresh sidebar
+    await loadCollections();
+    // Auto-select the new document
+    selectDocument(data.document.id);
+  } catch (e) {
+    showMsg(document.getElementById('sidebarMsg'), '❌ 分析失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📥 导入';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Translate
+// ══════════════════════════════════════════════════════════════
+
+async function startTranslate() {
+  if (translating || !currentDocId) return;
+  translating = true;
+  const btn = document.getElementById('translateBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ 翻译中...';
+
+  showProgress(0);
+
+  try {
+    const res = await fetch('/api/reader/translate/' + encodeURIComponent(currentDocId), {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
+      body: JSON.stringify({lang: '中文'}),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      showMsg(document.getElementById('sidebarMsg'), '❌ ' + (err.error || '翻译失败'), 'error');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let total = 1;
+    let done = 0;
+
+    while (true) {
+      const {done: streamDone, value} = await reader.read();
+      if (streamDone) break;
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+        try {
+          const event = JSON.parse(raw);
+          handleTranslateEvent(event);
+          if (event.type === 'progress') {
+            total = event.total || 1;
+          }
+          if (event.type === 'para_done') {
+            done++;
+            showProgress(Math.round((done / total) * 100));
+          }
+          if (event.type === 'all_done') {
+            done = event.done || done;
+            total = event.total || total;
+            showProgress(100);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Re-read document to get fresh data
+    await selectDocument(currentDocId);
+
+    showMsg(document.getElementById('sidebarMsg'), `✅ 翻译完成 (${done}/${total})`, 'success', 4000);
+    refreshSidebar();
+
+  } catch (e) {
+    showMsg(document.getElementById('sidebarMsg'), '❌ 翻译失败: ' + e.message, 'error');
+  } finally {
+    translating = false;
+    btn.disabled = false;
+    btn.textContent = '🌐 翻译';
+    setTimeout(hideProgress, 2000);
+  }
+}
+
+function handleTranslateEvent(event) {
+  switch (event.type) {
+    case 'start':
+      break;
+    case 'progress':
+      break;
+    case 'para_start': {
+      // Update paragraph status in currentDocData
+      const sec = currentDocData?.[event.sec_index];
+      if (sec) {
+        const para = sec.paragraphs?.[event.para_index];
+        if (para && para.status === 'wait') {
+          para.status = 'translating';
+        }
+      }
+      break;
+    }
+    case 'para_done': {
+      // Update the paragraph
+      const sec = currentDocData?.[event.sec_index];
+      if (sec) {
+        const para = sec.paragraphs?.[event.para_index];
+        if (para) {
+          para.status = 'done';
+          para.trans_html = event.trans_html || '';
+        }
+      }
+      // Live update this paragraph
+      const blocks = document.querySelectorAll('.para-block');
+      for (const block of blocks) {
+        if (parseInt(block.dataset.secIdx) === event.sec_index &&
+            parseInt(block.dataset.paraIdx) === event.para_index) {
+          if (currentView === 'interleaved') {
+            const transDiv = block.querySelector('.para-trans');
+            if (transDiv) {
+              transDiv.className = 'para-trans';
+              transDiv.style.color = '';
+              transDiv.style.borderLeftColor = '';
+              transDiv.innerHTML = event.trans_html || '';
+            }
+          } else {
+            const transPane = block.querySelector('.trans-pane > div:last-child');
+            if (transPane) {
+              transPane.innerHTML = event.trans_html || '';
+            }
+          }
+          break;
+        }
+      }
+      break;
+    }
+    case 'para_error': {
+      const sec = currentDocData?.[event.sec_index];
+      if (sec) {
+        const para = sec.paragraphs?.[event.para_index];
+        if (para) para.status = 'error';
+      }
+      break;
+    }
+    case 'all_done':
+      break;
+    case 'error':
+      showMsg(document.getElementById('sidebarMsg'), '❌ ' + (event.content || '翻译出错'), 'error');
+      break;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Collection management
+// ══════════════════════════════════════════════════════════════
+
+function showNewCollectionDialog() {
+  document.getElementById('newColDialog').classList.add('show');
+  document.getElementById('newColName').value = '';
+  document.getElementById('newColName').focus();
+}
+
+function closeNewCol() {
+  document.getElementById('newColDialog').classList.remove('show');
+}
+
+async function confirmNewCol() {
+  const name = document.getElementById('newColName').value.trim();
+  if (!name) return;
+  closeNewCol();
+  try {
+    await fetch('/api/reader/collections', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
+      body: JSON.stringify({name}),
+    });
+    await loadCollections();
+  } catch (e) {
+    showMsg(document.getElementById('sidebarMsg'), '创建失败: ' + e.message, 'error');
+  }
+}
+
+async function deleteCollection(colId) {
+  if (!confirm('确认删除这个书架及其所有文档？')) return;
+  try {
+    await fetch('/api/reader/collections/' + encodeURIComponent(colId), {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + TOKEN},
+    });
+    if (currentDocId) {
+      currentDocId = null;
+      currentDocData = null;
+      document.getElementById('mainHeader').style.display = 'none';
+      document.getElementById('readerContent').innerHTML =
+        `<div class="empty-state"><div class="icon">📖</div><p>选择一篇文章阅读</p></div>`;
+    }
+    await loadCollections();
+  } catch (e) {
+    showMsg(document.getElementById('sidebarMsg'), '删除失败: ' + e.message, 'error');
+  }
+}
+
+function showNewDocDialog(colId) {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) {
+    document.getElementById('urlInput').focus();
+    showMsg(document.getElementById('sidebarMsg'), '先输入 URL', 'warn', 2000);
+    return;
+  }
+  // Just trigger analyze with that collection
+  document.getElementById('urlInput').focus();
+  analyzeUrl();
+}
+
+async function deleteDocument() {
+  if (!currentDocId || !confirm('确认删除这个文档？翻译内容也将一并删除。')) return;
+  try {
+    await fetch('/api/reader/documents/' + encodeURIComponent(currentDocId), {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + TOKEN},
+    });
+    currentDocId = null;
+    currentDocData = null;
+    document.getElementById('mainHeader').style.display = 'none';
+    document.getElementById('readerContent').innerHTML =
+      `<div class="empty-state"><div class="icon">📖</div><p>选择一篇文章阅读</p></div>`;
+    await loadCollections();
+  } catch (e) {
+    showMsg(document.getElementById('sidebarMsg'), '删除失败: ' + e.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
+
+loadCollections();
+</script>
+</body>
+</html>

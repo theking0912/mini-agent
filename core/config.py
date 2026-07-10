@@ -128,8 +128,10 @@ def load_config() -> AppConfig:
         import json
         raw = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"⚠️  配置文件加载失败 ({e})，回退到环境变量模式")
-        return _legacy_config()
+        raise RuntimeError(
+            f"配置文件加载失败: {CONFIG_FILE}\\n{e}\\n"
+            f"请检查 JSON 格式是否正确，或删除该文件让系统重新生成默认配置。"
+        ) from e
 
     # 解析
     app_cfg = AppConfig()
@@ -195,22 +197,6 @@ def _create_default_config():
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_FILE.write_text(default_content, encoding="utf-8")
     print(f"📝 已创建默认配置文件: {CONFIG_FILE}")
-
-
-def _legacy_config() -> AppConfig:
-    """回退：从环境变量读取（兼容旧版 OPENAI_API_KEY / LLM_MODEL / OPENAI_BASE_URL）"""
-    app_cfg = AppConfig()
-    m = ModelConfig(
-        name="default",
-        api_key=os.environ.get("OPENAI_API_KEY", ""),
-        base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-        model=os.environ.get("LLM_MODEL", "gpt-4o"),
-        description="环境变量模式 (OPENAI_API_KEY)",
-    )
-    app_cfg.models["default"] = m
-    app_cfg.default_model = "default"
-    app_cfg._current = "default"
-    return app_cfg
 
 
 # ── 全局单例 ──────────────────────────────────────────────────

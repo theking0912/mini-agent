@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mini Agent — 业务架构 + Agent 分析</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#f8fafc;color:#1e293b;padding:20px;max-width:1400px;margin:0 auto}
+h1{font-size:22px;margin-bottom:4px}
+.sub{color:#64748b;font-size:13px;margin-bottom:20px}
+.sb{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.sb .st{background:#fff;border-radius:8px;padding:11px 16px;border:1px solid #e2e8f0;flex:1;min-width:100px}
+.sb .st .n{font-size:22px;font-weight:700;color:#0f172a}
+.sb .st .l{font-size:11px;color:#64748b;margin-top:2px}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:24px;font-size:12px}
+th{background:#f1f5f9;padding:8px 10px;text-align:left;font-weight:600;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.4px;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+tr:hover td{background:#f8fafc}
+.an{font-weight:600;color:#0f172a}
+.s-good{color:#059669;font-weight:600}
+.s-warn{color:#d97706;font-weight:600}
+.s-bad{color:#dc2626;font-weight:600}
+.pct{font-weight:600}
+h2{font-size:15px;margin:24px 0 10px;color:#0f172a;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+h3{font-size:13px;margin:12px 0 6px;color:#0f172a}
+.gr{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-bottom:24px}
+.ag{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:11px}
+.ag h4{font-size:13px;margin-bottom:6px;color:#0f172a;padding-bottom:4px;border-bottom:1px solid #f1f5f9}
+.gs{margin:4px 0;padding:2px 0}
+.gt{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:600;margin-bottom:4px}
+.gt.be{background:#fef3c7;color:#92400e}
+.gt.fe{background:#fce7f3;color:#9d174d}
+.gt.auth{background:#fee2e2;color:#991b1b}
+.ag code{font-size:10px;color:#475569;background:#f8fafc;padding:1px 4px;border-radius:2px;margin:1px 0;display:inline-block;word-break:break-all}
+.ok{color:#059669;font-size:14px;padding:12px;background:#f0fdf4;border-radius:8px}
+/* Flow canvas */
+#flow{width:100%;height:480px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:20px;position:relative}
+#fc{position:absolute;top:8px;right:8px;z-index:10;display:flex;gap:3px;flex-wrap:wrap;max-width:80%;justify-content:flex-end}
+#fc button{padding:3px 8px;border:1px solid #e2e8f0;background:#fff;border-radius:4px;font-size:10px;cursor:pointer;color:#475569;white-space:nowrap}
+#fc button:hover{background:#f1f5f9}
+#fc button.act{background:#FF6B35;color:#fff;border-color:#FF6B35}
+/* Agent section */
+.agent-layout{display:block;margin-bottom:24px}
+.agent-full{min-width:0}
+.agent-full h3{font-size:13px;color:#0f172a;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-bottom:8px;font-weight:600}
+.sub-count{font-weight:400;color:#94a3b8;font-size:11px}
+.agt{font-size:11px;width:100%}
+.agt td,.agt th{padding:4px 6px;font-size:10px;white-space:nowrap}
+.agt td code{font-size:9px;background:#f8fafc;padding:1px 3px;border-radius:2px;word-break:break-all}
+.agt-scroll{overflow-x:auto}
+.tl-🟢{color:#059669;font-weight:700}
+.tl-🟡{color:#d97706;font-weight:700}
+.tl-🔴{color:#dc2626;font-weight:700}
+/* Frontend call quality badges */
+.fe-badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;white-space:nowrap}
+.fe-ok{background:#d1fae5;color:#065f46}
+.fe-warn{background:#fef3c7;color:#92400e}
+.fe-no{background:#f1f5f9;color:#94a3b8}
+/* Workflow cards */
+.wf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.wf-card{font-size:11px}
+.wf-desc{color:#64748b;font-size:10px;margin:4px 0}
+.wf-bar{height:4px;background:#e2e8f0;border-radius:2px;margin:6px 0;overflow:hidden}
+.wf-fill{height:100%;border-radius:2px;transition:width .3s}
+.wf-pipe{font-size:10px;margin:4px 0;display:flex;flex-wrap:wrap;gap:2px}
+.wf-step{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600}
+.wf-on{background:#d1fae5;color:#065f46}
+.wf-off{background:#f1f5f9;color:#94a3b8}
+.wf-badge{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;float:right}
+.wf-ok{background:#d1fae5;color:#065f46}
+.wf-part{background:#fef3c7;color:#92400e}
+.wf-trigger{color:#6366f1;font-size:9px;margin-top:4px}
+@media(max-width:800px){.wf-grid{grid-template-columns:1fr}.sb .st{min-width:calc(50% - 6px)}.gr{grid-template-columns:1fr}table{font-size:10px}th,td{padding:4px 6px}}
+</style>
+</head>
+<body>
+<h1>📊 Mini Agent — 业务架构完整性分析 + AI Agent 集成评估</h1>
+<p class="sub">基于前后端静态分析 | 展示 数据模型→服务→API→前端页面的完整链路 及 Agent 工具化潜力</p>
+
+<div class="sb">
+  <div class="st"><div class="n">10</div><div class="l">业务领域</div></div>
+  <div class="st"><div class="n">18</div><div class="l">API端点</div></div>
+  <div class="st"><div class="n" style="color:#059669">0</div><div class="l">完整链路</div></div>
+  <div class="st"><div class="n" style="color:#d97706">10</div><div class="l">部分实现</div></div>
+  <div class="st"><div class="n" style="color:#dc2626">4</div><div class="l">缺鉴权端点</div></div>
+  <div class="st"><div class="n" style="color:#6366f1">18</div><div class="l">前后端不匹配</div></div>
+</div>
+
+<h2>📋 业务领域完整性矩阵</h2>
+<table>
+<thead><tr>
+  <th>业务领域</th><th>状态</th><th>完整度</th><th>服务</th><th>API</th><th>前端调用</th><th>前端页面</th><th>缺鉴权</th><th>缺前端</th><th>缺后端</th>
+</tr></thead>
+<tbody>
+    <tr>
+      <td class="an">auth</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>5</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>5</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">avatar</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>2</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">business-graph</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">chat</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">key</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>3</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>3</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">mini-agent-graph</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">models</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">page</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>2</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>2</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">reset</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>    <tr>
+      <td class="an">switch</td>
+      <td class="s-warn">🟡 部分</td>
+      <td class="pct">50%</td>
+      <td>⛔</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+</tbody>
+</table>
+
+<h2>🔀 业务流向图</h2>
+<div id="flow">
+  <canvas id="fcv" style="width:100%;height:100%"></canvas>
+  <div id="fc"></div>
+</div>
+
+<h2>🔍 差距分析 <span style="font-size:12px;color:#64748b;font-weight:400">（后端有但前端无 / 前端调用但后端无 / 缺少鉴权）</span></h2>
+<div class="gr">
+    <div class="ag"><h4>auth</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>POST /api/auth/register</code>
+        <code>POST /api/auth/verify</code>
+        <code>POST /api/auth/login</code>
+        <code>GET /api/auth/me</code>
+        <code>POST /api/auth/logout</code>
+      </div>
+    </div>
+    <div class="ag"><h4>avatar</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>GET /api/avatar/{user_id}</code>
+        <code>POST /api/avatar/upload</code>
+      </div>
+      <div class="gs"><span class="gt auth">🔓 缺少鉴权</span>
+        <code>GET /api/avatar/{user_id}</code>
+      </div>
+    </div>
+    <div class="ag"><h4>business-graph</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>GET /business-graph</code>
+      </div>
+      <div class="gs"><span class="gt auth">🔓 缺少鉴权</span>
+        <code>GET /business-graph</code>
+      </div>
+    </div>
+    <div class="ag"><h4>chat</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>POST /api/chat</code>
+      </div>
+    </div>
+    <div class="ag"><h4>key</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>POST /api/key/set</code>
+        <code>POST /api/key/remove</code>
+        <code>GET /api/key/list</code>
+      </div>
+    </div>
+    <div class="ag"><h4>mini-agent-graph</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>GET /mini-agent-graph</code>
+      </div>
+      <div class="gs"><span class="gt auth">🔓 缺少鉴权</span>
+        <code>GET /mini-agent-graph</code>
+      </div>
+    </div>
+    <div class="ag"><h4>models</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>GET /api/models</code>
+      </div>
+    </div>
+    <div class="ag"><h4>page</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>GET /</code>
+        <code>GET /auth</code>
+      </div>
+      <div class="gs"><span class="gt auth">🔓 缺少鉴权</span>
+        <code>GET /</code>
+      </div>
+    </div>
+    <div class="ag"><h4>reset</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>POST /api/reset</code>
+      </div>
+    </div>
+    <div class="ag"><h4>switch</h4>
+      <div class="gs"><span class="gt be">🔗 后端无前端消费</span>
+        <code>POST /api/switch</code>
+      </div>
+    </div>
+
+</div>
+
+
+<h2>🤖 AI Agent 集成层</h2>
+<p class="sub" style="margin-bottom:12px">将 API 映射为 Agent 可消费的工具 (Tool Calling)，编排跨域工作流</p>
+
+<div class="agent-layout">
+
+<div class="agent-full">
+  <h3>🔧 Agent 工具候选 <span class="sub-count">18 个端点</span></h3>
+  <p class="sub" style="font-size:11px">🟢 安全可暴露  🟡 需谨慎验证  🔴 风险高（DELETE类） | 鉴权列标记 🔑 表示需登录上下文</p>
+  <div class="agt-scroll">
+  <table class="agt">
+    <thead><tr><th>适合度</th><th>领域</th><th>API端点</th><th>工具名</th><th>鉴权</th><th>前端已消费</th><th>前端调用详情</th><th>描述</th></tr></thead>
+    <tbody>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">auth</td>
+      <td><code>GET /api/auth/me</code></td>
+      <td><code>auth_me</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取当前用户信息</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">key</td>
+      <td><code>GET /api/key/list</code></td>
+      <td><code>key_list</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>列出已配置的 API Key</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">models</td>
+      <td><code>GET /api/models</code></td>
+      <td><code>models_list</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>列出可用模型列表</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">page</td>
+      <td><code>GET /auth</code></td>
+      <td><code>page_auth</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取page</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">avatar</td>
+      <td><code>GET /api/avatar/{user_id}</code></td>
+      <td><code>avatar_detail</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取用户头像</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">business-graph</td>
+      <td><code>GET /business-graph</code></td>
+      <td><code>business-graph_list</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取business-graph</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">mini-agent-graph</td>
+      <td><code>GET /mini-agent-graph</code></td>
+      <td><code>mini-agent-graph_list</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取mini-agent-graph</td>
+    </tr>    <tr>
+      <td><span class="tl-🟢">🟢</span></td>
+      <td class="an">page</td>
+      <td><code>GET /</code></td>
+      <td><code>page_root</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>获取page</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">auth</td>
+      <td><code>POST /api/auth/logout</code></td>
+      <td><code>auth_logout</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>退出登录</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">avatar</td>
+      <td><code>POST /api/avatar/upload</code></td>
+      <td><code>avatar_upload</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>上传用户头像</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">chat</td>
+      <td><code>POST /api/chat</code></td>
+      <td><code>chat_create</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>发送聊天消息</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">key</td>
+      <td><code>POST /api/key/set</code></td>
+      <td><code>key_set</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>设置模型 API Key</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">key</td>
+      <td><code>POST /api/key/remove</code></td>
+      <td><code>key_remove</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>移除模型 API Key</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">reset</td>
+      <td><code>POST /api/reset</code></td>
+      <td><code>reset_create</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>重置对话上下文</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">switch</td>
+      <td><code>POST /api/switch</code></td>
+      <td><code>switch_create</code></td>
+      <td>🔑</td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>切换当前模型</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">auth</td>
+      <td><code>POST /api/auth/register</code></td>
+      <td><code>auth_register</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>注册新用户</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">auth</td>
+      <td><code>POST /api/auth/verify</code></td>
+      <td><code>auth_verify</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>验证邮箱验证码</td>
+    </tr>    <tr>
+      <td><span class="tl-🟡">🟡</span></td>
+      <td class="an">auth</td>
+      <td><code>POST /api/auth/login</code></td>
+      <td><code>auth_login</code></td>
+      <td></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td><span class="fe-badge fe-no">否</span></td>
+      <td>用户登录</td>
+    </tr></tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:16px">🎯 跨域工作流编排 (Agent Orchestration)</h3>
+  <p class="sub" style="font-size:11px">Agent 可以编排多个域的 API 组合完成复杂的业务操作，替代用户手动切换页面</p>
+  <div class="wf-grid">    <div class="ag wf-card">
+      <h4>用户注册到聊天 <span class="wf-badge wf-ok">4/4</span></h4>
+      <div class="wf-desc">注册 → 验证邮箱 → 登录 → 开始聊天</div>
+      <div class="wf-bar"><div class="wf-fill" style="width:100%;background:#10B981"></div></div>
+      <div class="wf-pipe"><span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">chat</span></div>
+      <div class="wf-trigger">🎯 触发场景：新用户首次使用 Agent</div>
+    </div>    <div class="ag wf-card">
+      <h4>模型配置与对话 <span class="wf-badge wf-ok">2/4</span></h4>
+      <div class="wf-desc">登录 → 选择模型 → 设置API Key → 聊天</div>
+      <div class="wf-bar"><div class="wf-fill" style="width:50%;background:#10B981"></div></div>
+      <div class="wf-pipe"><span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">model</span> → <span class="wf-step wf-on">model</span> → <span class="wf-step wf-off">chat</span></div>
+      <div class="wf-trigger">🎯 触发场景：用户切换模型或配置 API Key</div>
+    </div>    <div class="ag wf-card">
+      <h4>API Key 生命周期 <span class="wf-badge wf-part">1/4</span></h4>
+      <div class="wf-desc">设置Key → 查看Key列表 → 移除Key → 使用新配置聊天</div>
+      <div class="wf-bar"><div class="wf-fill" style="width:25%;background:#F59E0B"></div></div>
+      <div class="wf-pipe"><span class="wf-step wf-on">model</span> → <span class="wf-step wf-on">model</span> → <span class="wf-step wf-on">model</span> → <span class="wf-step wf-off">chat</span></div>
+      <div class="wf-trigger">🎯 触发场景：用户管理 API Key</div>
+    </div>    <div class="ag wf-card">
+      <h4>用户资料管理 <span class="wf-badge wf-ok">3/3</span></h4>
+      <div class="wf-desc">登录 → 查看资料 → 上传头像</div>
+      <div class="wf-bar"><div class="wf-fill" style="width:100%;background:#10B981"></div></div>
+      <div class="wf-pipe"><span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">auth</span> → <span class="wf-step wf-on">avatar</span></div>
+      <div class="wf-trigger">🎯 触发场景：用户管理个人资料</div>
+    </div></div>
+</div>
+
+</div>
+
+
+<script id="vd" type="application/json">
+{"analysis": {"auth": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 5, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["POST /api/auth/register", "POST /api/auth/verify", "POST /api/auth/login", "GET /api/auth/me", "POST /api/auth/logout"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"POST /api/auth/register": {"method": "POST", "path": "/api/auth/register", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}, "POST /api/auth/verify": {"method": "POST", "path": "/api/auth/verify", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}, "POST /api/auth/login": {"method": "POST", "path": "/api/auth/login", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}, "GET /api/auth/me": {"method": "GET", "path": "/api/auth/me", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}, "POST /api/auth/logout": {"method": "POST", "path": "/api/auth/logout", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "avatar": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 2, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["GET /api/avatar/{user_id}", "POST /api/avatar/upload"], "no_auth": ["GET /api/avatar/{user_id}"], "service_names": [], "page_names": [], "all_routes": {"GET /api/avatar/{user_id}": {"method": "GET", "path": "/api/avatar/{user_id}", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}, "POST /api/avatar/upload": {"method": "POST", "path": "/api/avatar/upload", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "business-graph": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["GET /business-graph"], "no_auth": ["GET /business-graph"], "service_names": [], "page_names": [], "all_routes": {"GET /business-graph": {"method": "GET", "path": "/business-graph", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}}, "all_matched": []}, "chat": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["POST /api/chat"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"POST /api/chat": {"method": "POST", "path": "/api/chat", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "key": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 3, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["POST /api/key/set", "POST /api/key/remove", "GET /api/key/list"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"POST /api/key/set": {"method": "POST", "path": "/api/key/set", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}, "POST /api/key/remove": {"method": "POST", "path": "/api/key/remove", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}, "GET /api/key/list": {"method": "GET", "path": "/api/key/list", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "mini-agent-graph": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["GET /mini-agent-graph"], "no_auth": ["GET /mini-agent-graph"], "service_names": [], "page_names": [], "all_routes": {"GET /mini-agent-graph": {"method": "GET", "path": "/mini-agent-graph", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}}, "all_matched": []}, "models": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["GET /api/models"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"GET /api/models": {"method": "GET", "path": "/api/models", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "page": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 2, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["GET /", "GET /auth"], "no_auth": ["GET /"], "service_names": [], "page_names": [], "all_routes": {"GET /": {"method": "GET", "path": "/", "area": "server", "file": "server.py", "has_auth": false, "response_model": "", "func_name": ""}, "GET /auth": {"method": "GET", "path": "/auth", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "reset": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["POST /api/reset"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"POST /api/reset": {"method": "POST", "path": "/api/reset", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}, "switch": {"score": 50, "has_service": false, "has_apis": true, "has_fe": false, "api_count": 1, "fe_call_count": 0, "page_count": 0, "matched": [], "unmatched_fe": [], "unmatched_be": ["POST /api/switch"], "no_auth": [], "service_names": [], "page_names": [], "all_routes": {"POST /api/switch": {"method": "POST", "path": "/api/switch", "area": "server", "file": "server.py", "has_auth": true, "response_model": "", "func_name": ""}}, "all_matched": []}}, "agent": {"tool_candidates": {"auth": [{"rid": "POST /api/auth/register", "domain": "auth", "method": "POST", "path": "/api/auth/register", "score": 2, "level": "🟡", "crud_type": "create", "tool_name": "auth_register", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "注册新用户"}, {"rid": "POST /api/auth/verify", "domain": "auth", "method": "POST", "path": "/api/auth/verify", "score": 2, "level": "🟡", "crud_type": "create", "tool_name": "auth_verify", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "验证邮箱验证码"}, {"rid": "POST /api/auth/login", "domain": "auth", "method": "POST", "path": "/api/auth/login", "score": 2, "level": "🟡", "crud_type": "create", "tool_name": "auth_login", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "用户登录"}, {"rid": "GET /api/auth/me", "domain": "auth", "method": "GET", "path": "/api/auth/me", "score": 3.5, "level": "🟢", "crud_type": "list", "tool_name": "auth_me", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取当前用户信息"}, {"rid": "POST /api/auth/logout", "domain": "auth", "method": "POST", "path": "/api/auth/logout", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "auth_logout", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "退出登录"}], "avatar": [{"rid": "GET /api/avatar/{user_id}", "domain": "avatar", "method": "GET", "path": "/api/avatar/{user_id}", "score": 3, "level": "🟢", "crud_type": "detail", "tool_name": "avatar_detail", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取用户头像"}, {"rid": "POST /api/avatar/upload", "domain": "avatar", "method": "POST", "path": "/api/avatar/upload", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "avatar_upload", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "上传用户头像"}], "business-graph": [{"rid": "GET /business-graph", "domain": "business-graph", "method": "GET", "path": "/business-graph", "score": 3, "level": "🟢", "crud_type": "list", "tool_name": "business-graph_list", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取business-graph"}], "chat": [{"rid": "POST /api/chat", "domain": "chat", "method": "POST", "path": "/api/chat", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "chat_create", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "发送聊天消息"}], "key": [{"rid": "POST /api/key/set", "domain": "key", "method": "POST", "path": "/api/key/set", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "key_set", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "设置模型 API Key"}, {"rid": "POST /api/key/remove", "domain": "key", "method": "POST", "path": "/api/key/remove", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "key_remove", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "移除模型 API Key"}, {"rid": "GET /api/key/list", "domain": "key", "method": "GET", "path": "/api/key/list", "score": 3.5, "level": "🟢", "crud_type": "list", "tool_name": "key_list", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "列出已配置的 API Key"}], "mini-agent-graph": [{"rid": "GET /mini-agent-graph", "domain": "mini-agent-graph", "method": "GET", "path": "/mini-agent-graph", "score": 3, "level": "🟢", "crud_type": "list", "tool_name": "mini-agent-graph_list", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取mini-agent-graph"}], "models": [{"rid": "GET /api/models", "domain": "models", "method": "GET", "path": "/api/models", "score": 3.5, "level": "🟢", "crud_type": "list", "tool_name": "models_list", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "列出可用模型列表"}], "page": [{"rid": "GET /", "domain": "page", "method": "GET", "path": "/", "score": 3, "level": "🟢", "crud_type": "list", "tool_name": "page_root", "needs_auth": false, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取page"}, {"rid": "GET /auth", "domain": "page", "method": "GET", "path": "/auth", "score": 3.5, "level": "🟢", "crud_type": "list", "tool_name": "page_auth", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "获取page"}], "reset": [{"rid": "POST /api/reset", "domain": "reset", "method": "POST", "path": "/api/reset", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "reset_create", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "重置对话上下文"}], "switch": [{"rid": "POST /api/switch", "domain": "switch", "method": "POST", "path": "/api/switch", "score": 2.5, "level": "🟡", "crud_type": "create", "tool_name": "switch_create", "needs_auth": true, "has_fe_consumer": false, "fe_call_detail": null, "description": "切换当前模型"}]}, "workflow_chains": [{"name": "用户注册到聊天", "steps": ["auth", "auth", "auth", "chat"], "description": "注册 → 验证邮箱 → 登录 → 开始聊天", "trigger": "新用户首次使用 Agent", "present_count": 4, "total_steps": 4, "feasible": true}, {"name": "模型配置与对话", "steps": ["auth", "model", "model", "chat"], "description": "登录 → 选择模型 → 设置API Key → 聊天", "trigger": "用户切换模型或配置 API Key", "present_count": 2, "total_steps": 4, "feasible": true}, {"name": "API Key 生命周期", "steps": ["model", "model", "model", "chat"], "description": "设置Key → 查看Key列表 → 移除Key → 使用新配置聊天", "trigger": "用户管理 API Key", "present_count": 1, "total_steps": 4, "feasible": false}, {"name": "用户资料管理", "steps": ["auth", "auth", "avatar"], "description": "登录 → 查看资料 → 上传头像", "trigger": "用户管理个人资料", "present_count": 3, "total_steps": 3, "feasible": true}], "gap_priorities": [{"domain": "auth", "count": 5, "authed_count": 2, "priority": "高", "endpoints": ["POST /api/auth/register", "POST /api/auth/verify", "POST /api/auth/login", "GET /api/auth/me", "POST /api/auth/logout"]}, {"domain": "avatar", "count": 2, "authed_count": 1, "priority": "高", "endpoints": ["GET /api/avatar/{user_id}", "POST /api/avatar/upload"]}, {"domain": "business-graph", "count": 1, "authed_count": 0, "priority": "中", "endpoints": ["GET /business-graph"]}, {"domain": "chat", "count": 1, "authed_count": 1, "priority": "高", "endpoints": ["POST /api/chat"]}, {"domain": "key", "count": 3, "authed_count": 3, "priority": "高", "endpoints": ["POST /api/key/set", "POST /api/key/remove", "GET /api/key/list"]}, {"domain": "mini-agent-graph", "count": 1, "authed_count": 0, "priority": "中", "endpoints": ["GET /mini-agent-graph"]}, {"domain": "models", "count": 1, "authed_count": 1, "priority": "高", "endpoints": ["GET /api/models"]}, {"domain": "page", "count": 2, "authed_count": 1, "priority": "高", "endpoints": ["GET /", "GET /auth"]}, {"domain": "reset", "count": 1, "authed_count": 1, "priority": "高", "endpoints": ["POST /api/reset"]}, {"domain": "switch", "count": 1, "authed_count": 1, "priority": "高", "endpoints": ["POST /api/switch"]}]}}
+</script>
+<script>
+(function(){
+const D=JSON.parse(document.getElementById('vd').textContent);
+const A=D.analysis, AN=Object.keys(A).sort();
+const AD=D.agent;  // agent info
+const CA=document.getElementById('fcv'), CT=CA.getContext('2d');
+const CW=document.getElementById('flow');
+function rs(){CA.width=CW.offsetWidth*devicePixelRatio;CA.height=CW.offsetHeight*devicePixelRatio;CT.scale(devicePixelRatio,devicePixelRatio);}
+rs();window.addEventListener('resize',rs);
+
+function dr(i){
+  const W=CW.offsetWidth,H=CW.offsetHeight,T=40,B=30;
+  CT.clearRect(0,0,W,H);
+  if(i<0){ // overview
+    const cs=Math.max(1,Math.floor((W-80)/(170))),rs=Math.ceil(AN.length/cs),cW=(W-80)/cs,cH=(H-T-B)/rs;
+    AN.forEach((n,j)=>{
+      const co=j%cs,ro=Math.floor(j/cs),x=40+co*cW,y=T+ro*cH,a=A[n];
+      CT.fillStyle=a.score==100?'#f0fdf4':a.score>=50?'#fffbeb':'#fef2f2';
+      CT.strokeStyle=a.score==100?'#86efac':a.score>=50?'#fde68a':'#fecaca';
+      CT.lineWidth=2;CT.beginPath();CT.roundRect(x+2,y+2,cW-8,cH-8,6);CT.fill();CT.stroke();
+      CT.fillStyle='#0f172a';CT.font='bold 13px sans-serif';CT.textAlign='center';CT.fillText(n,x+cW/2,y+18);
+      CT.font='22px sans-serif';
+      CT.fillStyle=a.score==100?'#059669':a.score>=50?'#d97706':'#dc2626';
+      CT.fillText(a.score+'%',x+cW/2,y+44);
+      CT.font='10px sans-serif';CT.fillStyle='#64748b';
+      let s='';if(a.has_service)s+='⚙️S ';if(a.api_count)s+='🔗'+a.api_count+' ';if(a.page_count)s+='📄'+a.page_count;
+      CT.fillText(s,x+cW/2,y+cH-10);
+    });
+  }else{
+    const n=AN[i],a=A[n];
+    CT.fillStyle='#0f172a';CT.font='bold 14px sans-serif';CT.textAlign='left';
+    CT.fillText(n+' - '+a.score+'% 完整',30,20);
+    const ly=[];
+    if(a.service_names.length)ly.push({l:'⚙️ 服务',it:a.service_names.slice(0,6),c:'#10B981'});
+    if(a.matched.length)ly.push({l:'🔗 API→前端',it:a.matched.slice(0,8).map(x=>x.be.split(' ').pop().split('/').filter(Boolean).pop()||x.be.split(' ').pop()),c:'#FF6B35'});
+    if(a.page_names.length)ly.push({l:'📄 前端页面',it:a.page_names.slice(0,6),c:'#8B5CF6'});
+    // Agent tool badge
+    let tc=0;if(AD&&AD.tool_candidates&&AD.tool_candidates[n])tc=AD.tool_candidates[n].length;
+    if(tc&&tc>a.matched.length)ly.push({l:'🤖 可工具化',it:['+'+tc+'个 Agent 工具'],c:'#6366f1'});
+    if(!ly.length){CT.fillStyle='#94a3b8';CT.font='16px sans-serif';CT.textAlign='center';CT.fillText('暂无详细数据',W/2,H/2);return;}
+    const lH=Math.min(60,(H-T-B)/ly.length),lG=8,tH=ly.length*lH+(ly.length-1)*lG,sY=T+(H-T-B-tH)/2;
+    ly.forEach((lyr,li)=>{
+      const y=sY+li*(lH+lG),pH=Math.min(26,lH-4);
+      CT.fillStyle='#64748b';CT.font='11px sans-serif';CT.textAlign='right';
+      CT.fillText(lyr.l,90,y+lH/2+3.5);
+      let x=100;
+      lyr.it.forEach(it=>{
+        CT.font='10px sans-serif';const tw=CT.measureText(it).width+14;
+        if(x+tw>W-40)return;
+        CT.fillStyle=lyr.c+'18';CT.beginPath();CT.roundRect(x,y+(lH-pH)/2,tw,pH,pH/2);CT.fill();
+        CT.strokeStyle=lyr.c+'40';CT.lineWidth=1;CT.beginPath();CT.roundRect(x,y+(lH-pH)/2,tw,pH,pH/2);CT.stroke();
+        CT.fillStyle='#1e293b';CT.textAlign='center';CT.fillText(it,x+tw/2,y+lH/2+3.5);
+        if(li<ly.length-1){
+          const nY=sY+(li+1)*(lH+lG)+lH/2,xx=x+tw/2;
+          CT.strokeStyle='#e2e8f0';CT.lineWidth=1;
+          CT.beginPath();CT.moveTo(xx,y+lH);CT.lineTo(xx,nY);CT.stroke();
+          CT.beginPath();CT.moveTo(xx-3,nY-3);CT.lineTo(xx,nY);CT.lineTo(xx+3,nY-3);CT.stroke();
+        }
+        x+=tw+5;
+      });
+    });
+  }
+}
+
+// Controls
+const fc=document.getElementById('fc');
+function mkbtn(t,f,a){const b=document.createElement('button');b.textContent=t;if(a)b.classList.add('act');b.onclick=()=>{fc.querySelectorAll('button').forEach(b=>b.classList.remove('act'));b.classList.add('act');dr(f);};fc.appendChild(b);}
+// roundRect polyfill — MUST be before dr(-1)
+if(!CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){if(r>w/2)r=w/2;if(r>h/2)r=h/2;this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.quadraticCurveTo(x+w,y,x+w,y+r);this.lineTo(x+w,y+h-r);this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);this.lineTo(x+r,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r);this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);this.closePath();};
+}
+mkbtn('📊 总览',-1,true);
+AN.forEach((n,i)=>mkbtn(n,i,false));
+dr(-1);
+})();
+</script>
+</body>
+</html>

@@ -60,8 +60,13 @@ def test_calculator_via_registry():
 
 def test_read_file_errors_on_nonexistent():
     """测试读取不存在的文件返回错误信息。"""
+    # 路径在项目目录外：白名单拒绝
     result = read_file({"path": "/tmp/nonexistent_file_xyz.txt"})
-    assert "不存在" in result or "error" in result.lower()
+    assert "安全限制" in result or "不存在" in result or "error" in result.lower()
+
+    # 路径在项目目录内但文件不存在
+    result2 = read_file({"path": "nonexistent_file_in_project.txt"})
+    assert "不存在" in result2
 
 
 def test_read_file_success():

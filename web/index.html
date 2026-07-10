@@ -19,7 +19,7 @@
     --error: #e17055;
     --radius: 10px;
     --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
-    --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -392,7 +392,101 @@
   .icon-svg { width: 1em; height: 1em; vertical-align: middle; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: inline-block; }
   .icon-svg.lg { width: 1.4em; height: 1.4em; }
   .icon-svg.xl { font-size: 48px; width: 1em; height: 1em; opacity: .3; }
+  /* ── Markdown 渲染样式 ── */
+  .msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 {
+    margin: 16px 0 8px;
+    line-height: 1.3;
+  }
+  .msg.assistant h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .msg.assistant h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .msg.assistant h3 { font-size: 15px; }
+  .msg.assistant h4 { font-size: 14px; }
+  .msg.assistant p { margin: 6px 0; }
+  .msg.assistant ul, .msg.assistant ol { margin: 6px 0; padding-left: 22px; }
+  .msg.assistant li { margin: 3px 0; }
+  .msg.assistant li > p { margin: 0; }
+  .msg.assistant blockquote {
+    margin: 8px 0;
+    padding: 6px 14px;
+    border-left: 3px solid var(--primary);
+    background: var(--surface2);
+    border-radius: 0 6px 6px 0;
+    color: var(--text2);
+  }
+  .msg.assistant blockquote p { margin: 2px 0; }
+  .msg.assistant hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+  }
+  .msg.assistant table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+    font-size: 13px;
+  }
+  .msg.assistant th, .msg.assistant td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .msg.assistant th {
+    background: var(--surface2);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .msg.assistant td {
+    color: var(--text2);
+  }
+  .msg.assistant tr:nth-child(even) td {
+    background: rgba(255,255,255,.02);
+  }
+  .msg.assistant pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    font-variant-ligatures: none;
+    tab-size: 4;
+  }
+  .msg.assistant code {
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-variant-ligatures: none;
+  }
+  .msg.assistant pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+  .msg.assistant a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  .msg.assistant a:hover { text-decoration: underline; }
+  .msg.assistant img {
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 8px 0;
+  }
 </style>
+
+<!-- Markdown 渲染库 -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+
+<!-- 等宽字体（保证盒状字符对齐） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -402,6 +496,7 @@
   <div class="header-actions">
     <span id="modelStatus" style="font-size:12px;color:var(--text2)"></span>
     <select id="modelSelector" class="model-select"></select>
+    <a href="/translate" class="btn btn-sm nav-btn" style="font-size:12px;text-decoration:none">🌐 翻译</a>
     <button class="btn btn-sm" onclick="openProfile('info')" id="profileBtn" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:50%;background:var(--primary)">
       <span id="headerAvatarFallback" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%"></span>
       <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;display:none" onerror="this.style.display='none'">
@@ -515,6 +610,12 @@ let abortController = null;
 
 // ── Init ──
 async function init() {
+  // 配置 Markdown 渲染
+  marked.setOptions({
+    breaks: true,       // GFM 换行
+    gfm: true,          // 表格、自动链接等
+  });
+
   // 验证 token 是否有效
   try {
     const res = await fetch('/api/auth/me', {headers: {'Authorization': 'Bearer ' + TOKEN}});
@@ -734,6 +835,8 @@ async function send() {
   
   const contentDiv = document.createElement('div');
   contentDiv.id = 'assistantContent';
+  // 流式渲染缓冲区
+  let mdBuffer = '';
   assistantDiv.appendChild(contentDiv);
 
   try {
@@ -769,7 +872,8 @@ async function send() {
           const data = JSON.parse(line.slice(6));
           
           if (data.type === 'token') {
-            contentDiv.textContent += data.content;
+            mdBuffer += data.content;
+            contentDiv.innerHTML = DOMPurify.sanitize(marked.parse(mdBuffer));
             scrollToBottom();
           } else if (data.type === 'tool_call') {
             const calls = data.tool_calls.map(tc => 
@@ -829,7 +933,7 @@ function addMsg(text, role) {
     label.textContent = '✦';
     div.appendChild(label);
     const content = document.createElement('div');
-    content.textContent = text;
+    content.innerHTML = DOMPurify.sanitize(marked.parse(text));
     div.appendChild(content);
   }
   chat.appendChild(div);

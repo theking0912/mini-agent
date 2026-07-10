@@ -23,13 +23,36 @@ def client():
     return AsyncClient(transport=transport, base_url="http://test")
 
 
+@pytest.fixture
+def auth_token():
+    """创建测试用户并返回有效的 Bearer token。"""
+    from core.user import create_user, generate_token, set_user_token, verify_user
+    email = "test@example.com"
+    password = "test123456"
+    try:
+        create_user(email, password)
+    except Exception:
+        pass  # user may already exist
+    verify_user(email)  # mark user as verified
+    token = generate_token()
+    set_user_token(email, token)
+    return token
+
+
 @pytest.mark.asyncio
-async def test_api_models_endpoint(client):
-    """GET /api/models 返回模型列表。"""
-    resp = await client.get("/api/models")
+async def test_api_models_endpoint(client, auth_token):
+    """GET /api/models 需要登录，返回模型列表。"""
+    resp = await client.get("/api/models", headers={"Authorization": f"Bearer {auth_token}"})
     assert resp.status_code == 200
     data = resp.json()
     assert "models" in data or isinstance(data, list)
+
+
+@pytest.mark.asyncio
+async def test_api_models_requires_auth(client):
+    """未登录时 GET /api/models 应返回 401。"""
+    resp = await client.get("/api/models")
+    assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
