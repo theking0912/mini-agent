@@ -777,15 +777,11 @@ async def _stream_reader_translate(
     """SSE 流式翻译文档"""
     from reader import get_translation_progress, translate_paragraph
     from reader.reader_service import _para_trans_key
-    yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-    yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
 
     try:
-        yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-        yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
-
+        progress = get_translation_progress(doc_id)
         if progress.get("pending", 0) == 0:
-            yield f"data: {json.dumps({'type': 'done', 'message': '所有段落已翻译完成'})}\\n\\n"
+            yield f"data: {json.dumps({'type': 'done', 'message': '所有段落已翻译完成'})}\n\n"
             return
 
         conn = get_conn_sync()
