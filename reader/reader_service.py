@@ -18,6 +18,30 @@ from .content_parser import analyze_url as _analyze_url
 READER_BUCKET = "reader"
 
 
+def _ensure_bucket():
+    """确保 reader bucket 存在（不存在则创建）"""
+    from core.storage import MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"{MINIO_ENDPOINT}/{READER_BUCKET}/", method="PUT", data=b"")
+        req.add_header("User-Agent", "MiniAgent/1.0")
+        # 用同样的 AWS4 签名
+        from core.storage import _aws4_sign
+        headers = _aws4_sign("PUT", f"{READER_BUCKET}/", b"", "application/octet-stream")
+        for k, v in headers.items():
+            req.add_header(k, v)
+        urllib.request.urlopen(req, timeout=5)
+    except urllib.error.HTTPError as e:
+        if e.code != 409:  # 409 = 已存在，正常
+            print(f"[Reader] Bucket create warning: {e.code}")
+    except Exception as e:
+        print(f"[Reader] Bucket create error: {e}")
+
+
+# 启动时自动确保 bucket 存在
+_ensure_bucket()
+
+
 # ── ✅ 段落内容 MinIO 路径 ────────────────────────────────────
 def _para_orig_key(doc_id: str, sec_i: int, para_i: int) -> str:
     """原文段落的 MinIO key"""
@@ -270,6 +294,7 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
                 """, (
                     doc_id, sec_idx, para_idx, sec_title,
                     orig_key, para_html, para_text,
+                    skip_translate,
                     "skip" if skip_translate else "wait",
                     char_count,
                 ))

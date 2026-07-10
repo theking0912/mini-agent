@@ -627,20 +627,20 @@ async def reader_list_collections(request: Request):
 @app.post("/api/reader/collections")
 async def reader_create_collection(request: Request):
     """创建新书架"""
+    from reader import create_collection
     u = require_user(request)
     data = await request.json()
     name = (data.get("name") or "").strip()
     if not name:
         return JSONResponse({"error": "书架名称不能为空"}, status_code=400)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     return create_collection(u["id"], name, data.get("icon", "📕"))
 
 
 @app.delete("/api/reader/collections/{collection_id}")
 async def reader_delete_collection(collection_id: str, request: Request):
     """删除书架"""
+    from reader import delete_collection
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     if delete_collection(collection_id, u["id"]):
         return {"message": "书架已删除"}
     return JSONResponse({"error": "书架不存在或无权限"}, status_code=404)
@@ -649,12 +649,12 @@ async def reader_delete_collection(collection_id: str, request: Request):
 @app.patch("/api/reader/collections/{collection_id}")
 async def reader_rename_collection(collection_id: str, request: Request):
     """重命名书架"""
+    from reader import rename_collection
     u = require_user(request)
     data = await request.json()
     name = (data.get("name") or "").strip()
     if not name:
         return JSONResponse({"error": "书架名称不能为空"}, status_code=400)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     result = rename_collection(
         collection_id, u["id"], name, data.get("icon")
     )
@@ -668,16 +668,16 @@ async def reader_rename_collection(collection_id: str, request: Request):
 @app.get("/api/reader/documents")
 async def reader_list_documents(request: Request, collection_id: str = None):
     """获取用户的文档列表"""
+    from reader import list_documents
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     return list_documents(u["id"], collection_id)
 
 
 @app.get("/api/reader/documents/{doc_id}")
 async def reader_get_document(doc_id: str, request: Request):
     """获取单个文档信息"""
+    from reader import get_document
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     doc = get_document(doc_id, u["id"])
     if not doc:
         return JSONResponse({"error": "文档不存在"}, status_code=404)
@@ -687,8 +687,8 @@ async def reader_get_document(doc_id: str, request: Request):
 @app.delete("/api/reader/documents/{doc_id}")
 async def reader_delete_document(doc_id: str, request: Request):
     """删除文档"""
+    from reader import delete_document
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     if delete_document(doc_id, u["id"]):
         return {"message": "文档已删除"}
     return JSONResponse({"error": "文档不存在或无权限"}, status_code=404)
@@ -705,8 +705,8 @@ async def reader_analyze(request: Request):
     if not url:
         return JSONResponse({"error": "URL 不能为空"}, status_code=400)
 
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     try:
+        from reader import analyze_and_store
         doc = await analyze_and_store(
             url, u["id"], data.get("collection_id"),
         )
@@ -722,8 +722,8 @@ async def reader_analyze(request: Request):
 @app.get("/api/reader/read/{doc_id}")
 async def reader_read(doc_id: str, request: Request):
     """获取文档全部章节+段落内容（含原文和译文 HTML）"""
+    from reader import get_sections_with_content
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     sections = get_sections_with_content(doc_id, u["id"])
     if sections is None:
         return JSONResponse({"error": "文档不存在或无权限"}, status_code=404)
@@ -775,7 +775,8 @@ async def _stream_reader_translate(
     api_key: str, base_url: str, model: str, lang: str,
 ):
     """SSE 流式翻译文档"""
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
+    from reader import get_translation_progress, translate_paragraph
+    from reader.reader_service import _para_trans_key
     yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
     yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
 
@@ -891,8 +892,8 @@ async def _stream_reader_translate(
 @app.get("/api/reader/progress/{doc_id}")
 async def reader_progress(doc_id: str, request: Request):
     """获取文档翻译进度"""
+    from reader import get_translation_progress
     u = require_user(request)
-    from reader import list_collections, create_collection, delete_collection, rename_collection, list_documents, get_document, delete_document, analyze_and_store, get_sections_with_content, translate_paragraph, get_translation_progress
     return get_translation_progress(doc_id, u["id"])
 
 

@@ -115,12 +115,12 @@ def minio_delete(path: str) -> bool:
 
 
 def minio_get(path: str) -> tuple[bytes, str] | None:
-    """从 MinIO 获取对象内容，返回 (data, content_type) 或 None"""
+    """从 MinIO 获取对象内容，返回 (data, content_type) 或 None（带签名）"""
     bucket, obj = path.split("/", 1)
     url = f"{MINIO_ENDPOINT}/{bucket}/{obj}"
     try:
-        req = _urllib.Request(url)
-        req.add_header("User-Agent", "MiniAgent/1.0")
+        headers = _aws4_sign("GET", path, None)
+        req = _urllib.Request(url, headers=headers, method="GET")
         with _urllib.urlopen(req, timeout=3) as resp:
             data = resp.read()
         ct = resp.headers.get("Content-Type", "image/png")
