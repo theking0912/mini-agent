@@ -534,6 +534,24 @@ if (!TOKEN) {
   document.getElementById('userInfo').textContent = USER.email || '';
 }
 
+// Unified API fetch: auto-handles auth failures and JSON parsing
+async function fetchApi(url, opts = {}) {
+  const headers = opts.headers || {};
+  headers['Authorization'] = 'Bearer ' + TOKEN;
+  if (opts.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(url, {...opts, headers});
+  const data = await res.json();
+  // Auth failure (FastAPI default)
+  if (data.detail) {
+    localStorage.removeItem('mini_agent_token');
+    localStorage.removeItem('mini_agent_user');
+    window.location.href = '/auth';
+  }
+  return data;
+}
+
 // ══════════════════════════════════════════════════════════════
 // State
 // ══════════════════════════════════════════════════════════════
@@ -583,10 +601,7 @@ function hideProgress() {
 
 async function loadCollections() {
   try {
-    const res = await fetch('/api/reader/collections', {
-      headers: {'Authorization': 'Bearer ' + TOKEN}
-    });
-    collections = await res.json();
+    collections = await fetchApi('/api/reader/collections');
     renderCollections();
   } catch (e) {
     console.error('Load collections failed:', e);
@@ -642,10 +657,7 @@ function renderCollections() {
 
 async function loadDocItems(collectionId, container, retries) {
   try {
-    const res = await fetch('/api/reader/documents?collection_id=' + encodeURIComponent(collectionId), {
-      headers: {'Authorization': 'Bearer ' + TOKEN}
-    });
-    const docs = await res.json();
+    const docs = await fetchApi('/api/reader/documents?collection_id=' + encodeURIComponent(collectionId));
     container.innerHTML = '';
     if (!docs || docs.length === 0) {
       container.innerHTML = '<div style="padding:6px 12px 6px 32px;font-size:11px;color:var(--text3)">暂无文档</div>';
@@ -697,10 +709,7 @@ async function selectDocument(docId) {
   hideProgress();
 
   try {
-    const res = await fetch('/api/reader/read/' + encodeURIComponent(docId), {
-      headers: {'Authorization': 'Bearer ' + TOKEN}
-    });
-    const data = await res.json();
+    const data = await fetchApi('/api/reader/read/' + encodeURIComponent(docId));
     if (data.error) { showReaderError(data.error); return; }
 
     currentDocData = data.sections || [];
@@ -887,12 +896,10 @@ async function analyzeUrl() {
   showMsg(document.getElementById('sidebarMsg'), '⏳ 正在抓取并分析页面...', 'info');
 
   try {
-    const res = await fetch('/api/reader/analyze', {
+    const data = await fetchApi('/api/reader/analyze', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
       body: JSON.stringify({url, collection_id: targetColId}),
     });
-    const data = await res.json();
     if (data.error) {
       showMsg(document.getElementById('sidebarMsg'), '❌ ' + data.error, 'error');
       return;
@@ -935,7 +942,12 @@ async function startTranslate() {
 
     if (!res.ok) {
       const err = await res.json();
-      showMsg(document.getElementById('sidebarMsg'), '❌ ' + (err.error || '翻译失败'), 'error');
+      if (err.detail) {
+        localStorage.removeItem('mini_agent_token');
+        localStorage.removeItem('mini_agent_user');
+        window.location.href = '/auth';
+      }
+      showMsg(document.getElementById('sidebarMsg'), '❌ ' + (err.detail || err.error || '翻译失败'), 'error');
       return;
     }
 
@@ -1077,9 +1089,8 @@ async function confirmNewCol() {
   if (!name) return;
   closeNewCol();
   try {
-    await fetch('/api/reader/collections', {
+    await fetchApi('/api/reader/collections', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
       body: JSON.stringify({name}),
     });
     await loadCollections();
@@ -1091,9 +1102,8 @@ async function confirmNewCol() {
 async function deleteCollection(colId) {
   if (!confirm('确认删除这个书架及其所有文档？')) return;
   try {
-    await fetch('/api/reader/collections/' + encodeURIComponent(colId), {
+    await fetchApi('/api/reader/collections/' + encodeURIComponent(colId), {
       method: 'DELETE',
-      headers: {'Authorization': 'Bearer ' + TOKEN},
     });
     if (currentDocId) {
       currentDocId = null;
@@ -1123,9 +1133,8 @@ function showNewDocDialog(colId) {
 async function deleteDocument() {
   if (!currentDocId || !confirm('确认删除这个文档？翻译内容也将一并删除。')) return;
   try {
-    await fetch('/api/reader/documents/' + encodeURIComponent(currentDocId), {
+    await fetchApi('/api/reader/documents/' + encodeURIComponent(currentDocId), {
       method: 'DELETE',
-      headers: {'Authorization': 'Bearer ' + TOKEN},
     });
     currentDocId = null;
     currentDocData = null;
