@@ -171,7 +171,8 @@ def get_user_keys(user_id: int) -> dict:
             decrypted = {}
             for model_name, val in raw.items():
                 plain = keyring.decrypt_value(val)
-                decrypted[model_name] = plain if plain is not None else val
+                if plain is not None:
+                    decrypted[model_name] = plain
             return decrypted
         return {}
     finally:
