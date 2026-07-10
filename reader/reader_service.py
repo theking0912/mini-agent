@@ -249,24 +249,27 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
                 char_count = para.get("char_count", 0)
                 skip_translate = para.get("skip_translate", False)
 
-                # 写入 MinIO
+                # 写入 MinIO（失败则静默跳过，DB 有回退）
                 orig_key = _para_orig_key(doc_id, sec_idx, para_idx)
-                minio_put(
-                    f"{READER_BUCKET}/{orig_key}",
-                    para_html.encode("utf-8"),
-                    "text/html; charset=utf-8",
-                )
+                try:
+                    minio_put(
+                        f"{READER_BUCKET}/{orig_key}",
+                        para_html.encode("utf-8"),
+                        "text/html; charset=utf-8",
+                    )
+                except Exception:
+                    orig_key = ""  # MinIO 不可用，标记为空
 
-                # 插入段落记录
+                # 插入段落记录（html_content 作为 DB 回退）
                 cur.execute("""
                     INSERT INTO sections
                         (document_id, sec_index, paragraph_index, title,
-                         html_content_key, text_content, skip_translate,
-                         status, char_count)
-                    VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s)
+                         html_content_key, html_content, text_content,
+                         skip_translate, status, char_count)
+                    VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     doc_id, sec_idx, para_idx, sec_title,
-                    orig_key, para_text, skip_translate,
+                    orig_key, para_html, para_text,
                     "skip" if skip_translate else "wait",
                     char_count,
                 ))
@@ -358,21 +361,27 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
                     "paragraphs": [],
                 }
 
-            # 从 MinIO 读取原文 HTML
+            # 从 MinIO 读取原文 HTML（失败则回退到 DB）
             orig_key = row["html_content_key"] or ""
-            orig_html = ""
-            if orig_key:
-                data = minio_get(f"{READER_BUCKET}/{orig_key}")
-                if data:
-                    orig_html = data[0].decode("utf-8", errors="replace")
+            orig_html = row.get("html_content") or ""
+            if orig_key and not orig_html:
+                try:
+                    data = minio_get(f"{READER_BUCKET}/{orig_key}")
+                    if data:
+                        orig_html = data[0].decode("utf-8", errors="replace")
+                except Exception:
+                    pass
 
-            # 从 MinIO 读取译文 HTML
+            # 从 MinIO 读取译文 HTML（失败则回退到 DB）
             trans_key = row["translated_html_key"] or ""
-            trans_html = ""
-            if trans_key:
-                data = minio_get(f"{READER_BUCKET}/{trans_key}")
-                if data:
-                    trans_html = data[0].decode("utf-8", errors="replace")
+            trans_html = row.get("translated_html") or ""
+            if trans_key and not trans_html:
+                try:
+                    data = minio_get(f"{READER_BUCKET}/{trans_key}")
+                    if data:
+                        trans_html = data[0].decode("utf-8", errors="replace")
+                except Exception:
+                    pass
 
             sections_map[sec_i]["paragraphs"].append({
                 "id": str(row["id"]),
@@ -484,11 +493,17 @@ async def translate_document(
 
         # 从 MinIO 读取原文
         if not html_key:
-            continue
-        data = minio_get(f"{READER_BUCKET}/{html_key}")
-        if not data:
-            continue
-        orig_html = data[0].decode("utf-8", errors="replace")
+            orig_html = row.get("html_content") or ""
+            if not orig_html:
+                continue
+        else:
+            try:
+                data = minio_get(f"{READER_BUCKET}/{html_key}")
+                orig_html = data[0].decode("utf-8", errors="replace") if data else (row.get("html_content") or "")
+            except Exception:
+                orig_html = row.get("html_content") or ""
+            if not orig_html:
+                continue
 
         try:
             # 调用 LLM 翻译

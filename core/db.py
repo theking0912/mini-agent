@@ -139,7 +139,20 @@ def init_db():
             UNIQUE(document_id, sec_index, paragraph_index)
         )
     """)
-    # 创建 sections 索引
+    # 检查 sections 表是否有 html_content 列
+    try:
+        cur.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name='sections' AND column_name='html_content'
+        """)
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE sections ADD COLUMN IF NOT EXISTS html_content TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE sections ADD COLUMN IF NOT EXISTS translated_html TEXT DEFAULT ''")
+            print("[DB] 已添加 html_content/translated_html 列到 sections 表")
+    except Exception:
+        pass
+
+    # 创建 MinIO reader bucket（忽略已存在错误）
     cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_sections_doc
         ON sections(document_id, sec_index, paragraph_index)
