@@ -162,12 +162,19 @@ def init_db():
         ON documents(user_id, collection_id)
     """)
 
+    # ── 系统配置表（持久化系统级 API Key，不依赖 salt）────────────
+    from core.config_store import create_table as create_config_table
+    create_config_table()
+
     cur.close()
     conn.close()
     print("[DB] 数据库表结构就绪")
 
     # 迁移存量明文 Key 到加密存储
     _migrate_plaintext_keys()
+
+    # 迁移当前环境变量 Key 到数据库
+    _seed_system_keys_to_db()
 
 
 def _migrate_plaintext_keys():
@@ -208,3 +215,24 @@ def _migrate_plaintext_keys():
 
     cur.close()
     conn.close()
+
+
+def _seed_system_keys_to_db():
+    """将当前环境变量中的系统 Key 写入 system_config 表（持久化，不依赖 salt）"""
+    try:
+        from core.config_store import get_system_key, set_system_key
+        from core.config import get_config
+    except Exception:
+        return
+
+    try:
+        cfg = get_config()
+        seeded = 0
+        for name, m in cfg.models.items():
+            if m.api_key and not get_system_key(name):
+                set_system_key(name, m.api_key)
+                seeded += 1
+        if seeded:
+            print(f"[DB] 已将 {seeded} 个系统 API Key 写入数据库持久化")
+    except Exception as e:
+        print(f"[DB] 写入系统 Key 到数据库时出错（非致命）: {e}")
