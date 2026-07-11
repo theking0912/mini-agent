@@ -484,7 +484,7 @@ async def _stream_chat(
                 words = content.split(" ")
                 for i, word in enumerate(words):
                     chunk = word + (" " if i < len(words) - 1 else "")
-                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
 
                 final_reply = content
                 break
