@@ -198,6 +198,49 @@ async def key_list(request: Request):
     return {"keys": models, "current": cfg.current_model.name}
 
 
+# ── 系统级 Key 管理（管理员，持久化到数据库）───────────────────
+@app.get("/api/admin/config")
+async def admin_list_config(request: Request):
+    """列出系统级 Key（仅 admin@mini.com）"""
+    u = require_user(request)
+    if u.get("email") != "admin@mini.com":
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    from core.config_store import list_system_keys
+    return {"keys": list_system_keys()}
+
+
+@app.post("/api/admin/config")
+async def admin_set_config(request: Request):
+    """设置系统级 Key（持久化到数据库，不依赖 salt）"""
+    u = require_user(request)
+    if u.get("email") != "admin@mini.com":
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    data = await request.json()
+    model_name = data.get("model", "")
+    api_key = data.get("key", "").strip()
+    if not model_name or not api_key:
+        return JSONResponse({"error": "模型和 Key 不能为空"}, status_code=400)
+    from core.config_store import set_system_key
+    set_system_key(model_name, api_key)
+    return {"message": f"✅ 系统级 {model_name} 的 API Key 已保存到数据库（持久化）"}
+
+
+@app.delete("/api/admin/config")
+async def admin_delete_config(request: Request):
+    """删除系统级 Key"""
+    u = require_user(request)
+    if u.get("email") != "admin@mini.com":
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    data = await request.json()
+    model_name = data.get("model", "")
+    if not model_name:
+        return JSONResponse({"error": "模型不能为空"}, status_code=400)
+    from core.config_store import delete_system_key
+    if delete_system_key(model_name):
+        return {"message": f"已删除系统级 {model_name} 的 Key"}
+    return JSONResponse({"error": f"{model_name} 没有保存的系统 Key"}, status_code=404)
+
+
 # ── 对话管理 ──────────────────────────────────────────────────
 @app.post("/api/reset")
 async def reset_context(request: Request):
