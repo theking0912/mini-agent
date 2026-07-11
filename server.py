@@ -435,8 +435,8 @@ async def chat(request: Request):
 async def _stream_no_key(model_name: str) -> AsyncGenerator[str, None]:
     """SSE: 告知前端未配置 API Key"""
     yield f"data: {json.dumps({'type': 'start', 'model': model_name})}\n\n"
-    yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-    yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+    yield f"data: {json.dumps({'type': 'error', 'content': f'❌ 未配置 {model_name} 的 API Key'})}\n\n"
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 
 async def _stream_chat(
@@ -484,8 +484,7 @@ async def _stream_chat(
                 words = content.split(" ")
                 for i, word in enumerate(words):
                     chunk = word + (" " if i < len(words) - 1 else "")
-                    yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-                    yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
 
                 final_reply = content
                 break
@@ -513,12 +512,14 @@ async def _stream_chat(
         if not final_reply:
             final_reply = "⚠️ 已达到最大工具调用轮次，请重试。"
             ctx.add_assistant(content=final_reply)
-            yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-            yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': final_reply})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            return
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}', 'model': cfg.current_model.name})}\n\n"
-    yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-    yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return
+    yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
 
 # ── 链接翻译 API ──────────────────────────────────────────────
@@ -611,8 +612,8 @@ async def _stream_translate(
         total = len(sections)
 
         if total == 0:
-            yield f"data: {json.dumps({'type': 'error', 'content': f'❌ {e}'})}\\n\\n"
-            yield f"data: {json.dumps({'type': 'done'})}\\n\\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': '❌ 未找到可翻译的章节'})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
             return
 
         # 确定要翻译的章节
