@@ -88,14 +88,24 @@ def _resolve_api_key(model_name: str, raw_value: str) -> str:
     """
     解析 API Key，优先级：
     1. 环境变量（${VAR} 插值后非空）
-    2. 加密 Key 存储（core.keyring）
+    2. 数据库系统配置（system_config 表，持久化，不依赖 salt）
+    3. 加密 Key 存储（core.keyring — 旧版 salt 文件兼容）
     """
-    # 先试环境变量
+    # 1. 环境变量（运行时最高优先级）
     env_val = _resolve_env(raw_value)
     if env_val and not env_val.startswith("${"):
         return env_val
 
-    # 再试加密 key 存储
+    # 2. 数据库系统配置（持久化，不依赖 salt，跨重启有效）
+    try:
+        from .config_store import get_system_key
+        db_val = get_system_key(model_name)
+        if db_val:
+            return db_val
+    except Exception:
+        pass
+
+    # 3. 加密 Key 存储（旧版兼容）
     try:
         from .keyring import load_key
         kr_val = load_key(model_name)
