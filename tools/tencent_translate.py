@@ -20,7 +20,7 @@ import urllib.request
 TMT_ENDPOINT = "https://tmt.tencentcloudapi.com"
 TMT_SERVICE = "tmt"
 TMT_VERSION = "2018-03-21"
-TMT_REGION = "ap-guangzhou"
+TMT_REGION = "ap-beijing"
 TMT_ACTION = "TextTranslate"
 
 # 单次翻译最大字节（Tencent TMT 限制约 2000 bytes，留余量）
@@ -43,9 +43,13 @@ def _sign_headers(secret_id: str, secret_key: str, payload: dict) -> dict:
     timestamp = int(time.time())
     date = time.strftime("%Y-%m-%d", time.gmtime(timestamp))
 
+    # Log that we're actually calling Tencent
+    text_preview = payload.get("SourceText", "")[:60]
+    print(f"[TencentTMT] Calling API: source={payload.get('Source','auto')} target={payload.get('Target','zh')} text='{text_preview}...'")
+
     # 1. Canonical Request
     payload_str = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    ct = "application/json; charset=utf-8"
+    ct = "application/json"
     canonical_headers = (
         f"content-type:{ct}\n"
         f"host:tmt.tencentcloudapi.com\n"
@@ -133,7 +137,7 @@ async def translate_text(
     }
 
     headers = _sign_headers(secret_id, secret_key, payload)
-    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
     req = urllib.request.Request(
         TMT_ENDPOINT,
