@@ -198,6 +198,43 @@ async def key_list(request: Request):
     return {"keys": models, "current": cfg.current_model.name}
 
 
+# ── Tencent 翻译密钥管理 ────────────────────────────────────
+
+
+@app.get("/api/key/tencent")
+async def tencent_key_status(request: Request):
+    """获取当前用户的 Tencent 翻译密钥配置状态"""
+    u = require_user(request)
+    user_keys = user.get_user_keys(u["id"])
+    return {
+        "has_id": bool(user_keys.get("tencent_secret_id")),
+        "has_key": bool(user_keys.get("tencent_secret_key")),
+    }
+
+
+@app.post("/api/key/tencent")
+async def tencent_key_set(request: Request):
+    """设置当前用户的 Tencent 翻译密钥"""
+    u = require_user(request)
+    data = await request.json()
+    secret_id = (data.get("secret_id") or "").strip()
+    secret_key = (data.get("secret_key") or "").strip()
+    if not secret_id or not secret_key:
+        return JSONResponse({"error": "SecretId 和 SecretKey 不能为空"}, status_code=400)
+    user.set_user_key(u["id"], "tencent_secret_id", secret_id)
+    user.set_user_key(u["id"], "tencent_secret_key", secret_key)
+    return {"message": "✅ Tencent 翻译密钥已保存"}
+
+
+@app.delete("/api/key/tencent")
+async def tencent_key_delete(request: Request):
+    """删除当前用户的 Tencent 翻译密钥"""
+    u = require_user(request)
+    user.delete_user_key(u["id"], "tencent_secret_id")
+    user.delete_user_key(u["id"], "tencent_secret_key")
+    return {"message": "已删除 Tencent 翻译密钥"}
+
+
 # ── 系统级 Key 管理（管理员，持久化到数据库）───────────────────
 @app.get("/api/admin/config")
 async def admin_list_config(request: Request):
@@ -548,8 +585,13 @@ async def translate_analyze(request: Request):
 async def translate(request: Request):
     """
     翻译 URL 内容（SSE 流式）
-    Body: { url, chapters: [title, ...], api_key?, base_url?, model? }
-    若 api_key/base_url/model 都为空，使用当前登录用户的默认模型。
+    Body: { url, chapters, engine?, api_key?, base_url?, model? }
+
+    翻译引擎：
+      - engine="tencent"（默认）→ 腾讯翻译 API，失败 LLM 兜底
+      - engine="llm"          → 直接大模型翻译
+
+      Tencent 密钥优先从用户的 api_keys 中读取（tencent_secret_id / tencent_secret_key）
     """
     u = _get_user(request)
     if not u:
@@ -561,14 +603,17 @@ async def translate(request: Request):
     if not url:
         return JSONResponse({"error": "URL 不能为空"}, status_code=400)
 
-    # 确定使用的模型和 Key
+    engine = (data.get("engine") or "tencent").strip().lower()
+    if engine not in ("tencent", "llm"):
+        engine = "tencent"
+
+    # 确定使用的模型和 Key（LLM 兜底用）
     api_key = (data.get("api_key") or "").strip()
     base_url = (data.get("base_url") or "").strip()
     model = (data.get("model") or "").strip()
-    percentage = data.get("percentage", 100)  # 翻译前百分之多少
+    percentage = data.get("percentage", 100)
 
     if not api_key or not base_url or not model:
-        # 用当前用户的默认模型
         cfg = get_config()
         mc = cfg.current_model
         if not api_key:
@@ -581,8 +626,14 @@ async def translate(request: Request):
     if not api_key:
         return JSONResponse({"error": "未配置 API Key，请在设置中添加或传入 api_key"}, status_code=400)
 
+    # 读取 Tencent 密钥
+    user_keys = user.get_user_keys(u["id"])
+    tencent_id = user_keys.get("tencent_secret_id", "")
+    tencent_key = user_keys.get("tencent_secret_key", "")
+
     return StreamingResponse(
-        _stream_translate(url, selected_titles, api_key, base_url, model, percentage),
+        _stream_translate(url, selected_titles, api_key, base_url, model, percentage,
+                          engine=engine, tencent_id=tencent_id, tencent_key=tencent_key),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -599,11 +650,14 @@ async def _stream_translate(
     base_url: str,
     model: str,
     percentage: int = 100,
+    engine: str = "tencent",
+    tencent_id: str = "",
+    tencent_key: str = "",
 ) -> AsyncGenerator[str, None]:
     """SSE 流式翻译"""
     from tools.url_fetch import analyze_url, translate_section
 
-    yield f"data: {json.dumps({'type': 'start', 'model': model})}\n\n"
+    yield f"data: {json.dumps({'type': 'start', 'model': model, 'engine': engine})}\n\n"
 
     try:
         # 分析 URL
@@ -636,7 +690,10 @@ async def _stream_translate(
             yield f"data: {json.dumps({'type': 'chapter_start', 'index': i, 'title': title, 'char_count': char_count})}\n\n"
 
             try:
-                translation = await translate_section(sec, api_key, base_url, model)
+                translation = await translate_section(
+                    sec, api_key, base_url, model,
+                    engine=engine, tencent_id=tencent_id, tencent_key=tencent_key,
+                )
                 words = translation.split(" ")
                 for j, word in enumerate(words):
                     chunk = word + (" " if j < len(words) - 1 else "")
@@ -789,6 +846,9 @@ async def reader_translate(doc_id: str, request: Request):
     base_url = (data.get("base_url") or "").strip()
     model = (data.get("model") or "").strip()
     lang = data.get("lang", "中文")
+    engine = (data.get("engine") or "tencent").strip().lower()
+    if engine not in ("tencent", "llm"):
+        engine = "tencent"
 
     if not api_key or not base_url or not model:
         cfg = get_config()
@@ -803,8 +863,14 @@ async def reader_translate(doc_id: str, request: Request):
     if not api_key:
         return JSONResponse({"error": "未配置 API Key"}, status_code=400)
 
+    # 读取 Tencent 密钥
+    user_keys = user_mod.get_user_keys(u["id"])
+    tencent_id = user_keys.get("tencent_secret_id", "")
+    tencent_key = user_keys.get("tencent_secret_key", "")
+
     return StreamingResponse(
-        _stream_reader_translate(doc_id, u["id"], api_key, base_url, model, lang),
+        _stream_reader_translate(doc_id, u["id"], api_key, base_url, model, lang,
+                                 engine=engine, tencent_id=tencent_id, tencent_key=tencent_key),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -817,6 +883,9 @@ async def reader_translate(doc_id: str, request: Request):
 async def _stream_reader_translate(
     doc_id: str, user_id: int,
     api_key: str, base_url: str, model: str, lang: str,
+    engine: str = "tencent",
+    tencent_id: str = "",
+    tencent_key: str = "",
 ):
     """SSE 流式翻译文档"""
     from reader import get_translation_progress, translate_paragraph
@@ -868,6 +937,7 @@ async def _stream_reader_translate(
                 trans_html = await translate_paragraph(
                     sec_id, orig_html, row["text_content"],
                     api_key, base_url, model, lang,
+                    engine=engine, tencent_id=tencent_id, tencent_key=tencent_key,
                 )
 
                 from core.storage import minio_put as _minio_put
