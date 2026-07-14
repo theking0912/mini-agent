@@ -38,18 +38,26 @@ def get_machine_code() -> str:
     生成机器码用于派生加密密钥
     
     策略（按优先级）：
+    0. MINI_AGENT_KEY_SALT 环境变量 —— 用户显式指定，永不漂移（Docker 推荐）
     1. 持久化 salt 文件（KEYRING_DIR/salt）—— Docker 友好，跨容器重启
     2. /etc/machine-id + hostname —— 裸机 Linux
     3. hostid + hostname —— 传统 fallback（自动生成 salt 保持跨重启）
     """
-    # 优先使用持久化 salt（在 KEYRING_DIR 中，随 volume 保留）
+    hostname = os.uname().nodename
+
+    # 优先级 0: 用户显式指定的 salt（Docker 友好，永不漂移）
+    # 注意：不拼接 hostname，避免容器重建后 hostname 变化导致解密失败
+    user_salt = os.environ.get("MINI_AGENT_KEY_SALT")
+    if user_salt:
+        KEYRING_DIR.mkdir(parents=True, exist_ok=True)
+        return hashlib.sha256(user_salt.encode()).hexdigest()
+
+    # 优先级 1: 持久化 salt 文件（在 KEYRING_DIR 中，随 volume 保留）
     salt_path = KEYRING_DIR / "salt"
     if salt_path.exists():
         salt = salt_path.read_text().strip()
-        hostname = os.uname().nodename
         raw = f"{salt}:{hostname}"
         result = hashlib.sha256(raw.encode()).hexdigest()
-        # 确保 salt 文件和 key 文件在同一个路径下
         KEYRING_DIR.mkdir(parents=True, exist_ok=True)
         return result
 
@@ -59,15 +67,12 @@ def get_machine_code() -> str:
     except (FileNotFoundError, PermissionError, OSError):
         pass
 
-    hostname = os.uname().nodename
-
-    # 没有 /etc/machine-id → Docker 或容器环境 → 用随机 salt 取代
+    # 优先级 2/3
     if not machine_id:
         salt = _ensure_salt()
         raw = f"{salt}:{hostname}"
         return hashlib.sha256(raw.encode()).hexdigest()
 
-    # 裸机 Linux：用 machine-id + hostname
     raw = f"{machine_id}:{hostname}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
