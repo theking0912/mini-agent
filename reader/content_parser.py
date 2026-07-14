@@ -8,6 +8,7 @@ Reader: 内容解析器 — 抓取网页, 保留 HTML 结构, 按章节/段落�
   - 每个段落保留完整 HTML 结构（代码块标记 skip_translate）
 """
 import re
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from lxml import html as lxml_html
@@ -303,6 +304,9 @@ async def analyze_url(url: str) -> dict:
     if title_el is not None:
         page_title = title_el.text_content().strip()
 
+    # ⚠️ 检测导航结构（必须在 _find_main 清理树之前，因为 nav/aside 会被清理）
+    detected_chapters = detect_chapters(doc, url)
+
     # 查找主内容区域
     main_el = _find_main(doc)
     if main_el is None:
@@ -325,6 +329,7 @@ async def analyze_url(url: str) -> dict:
         "url": url,
         "title": page_title,
         "sections": sections,
+        "detected_chapters": detected_chapters,
         "total_chars": total_chars,
         "total_paragraphs": total_paragraphs,
     }
@@ -332,17 +337,12 @@ async def analyze_url(url: str) -> dict:
 
 def _resolve_urls(sections: list[dict], base_url: str):
     """将段落 HTML 中的相对路径 img src 和 a href 转为绝对 URL"""
-    from urllib.parse import urljoin, urlparse
-
     def _resolve_in_html(html: str, attr: str) -> str:
-        """替换 HTML 中所有 tag 的 attr 属性值为绝对 URL"""
-        # Match: src="..." or src='...' or href="..." or href='...'
         pattern = rf'({attr}=["\'])([^"\']+)(["\'])'
         def replacer(m):
             prefix = m.group(1)
             val = m.group(2)
             suffix = m.group(3)
-            # Skip if already absolute (has scheme or starts with // /api/ /data:)
             if val.startswith(('http://', 'https://', '//', '/api/', 'data:', 'mailto:', 'tel:', '#', 'javascript:')):
                 return m.group(0)
             abs_url = urljoin(base_url, val)
@@ -351,7 +351,6 @@ def _resolve_urls(sections: list[dict], base_url: str):
 
     for sec in sections:
         for para in sec.get("paragraphs", []):
-            # 兼容 html / orig_html / trans_html 三种键名
             for key in ('html', 'orig_html', 'trans_html'):
                 html = para.get(key, "")
                 if html:
@@ -359,3 +358,129 @@ def _resolve_urls(sections: list[dict], base_url: str):
                     html = _resolve_in_html(html, 'href')
                     para[key] = html
                 para["char_count"] = len(para.get("text", ""))
+
+
+# ── 导航检测：提取多页文档的章节 URL ───────────────────────────
+
+
+def detect_chapters(doc, url: str) -> list[dict]:
+    """检测页面是否包含指向其它子页面的导航。
+
+    识别条件：
+    - 页面有 nav / sidebar / aside 等导航容器
+    - 容器内有 3+ 个指向同域名下不同路径的链接
+    - 链接文本是描述性标题（≥3字符）
+
+    返回: [{title, url}, ...]
+    """
+    from collections import Counter
+
+    parsed = urlparse(url)
+    base_domain = parsed.netloc
+    base_path = parsed.path.rstrip("/")
+
+    chapters: list[dict] = []
+    seen_urls: set = set()
+
+    def _is_same_site(href: str) -> bool:
+        """是否指向同站点其他页面（非锚点、非当前页）"""
+        if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            return False
+        # 解析 href
+        if href.startswith("//"):
+            href_full = "https:" + href
+        elif href.startswith("/"):
+            href_full = f"{parsed.scheme}://{parsed.netloc}{href}"
+        else:
+            href_full = urljoin(url, href)
+        hp = urlparse(href_full)
+        # 必须同域名
+        if hp.netloc != base_domain and f".{base_domain}" not in hp.netloc:
+            return False
+        # 排除自身
+        hp_path = hp.path.rstrip("/")
+        if hp_path == base_path or hp_path == base_path.rstrip("/index.html"):
+            return False
+        # 排除非文档后缀（图片/脚本/CSS等）
+        skip_exts = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",
+                     ".css", ".js", ".ico", ".pdf", ".zip", ".mp4", ".mp3"}
+        ext = hp_path.split("/")[-1].split(".")[-1].lower() if "." in hp_path.split("/")[-1] else ""
+        if ext and f".{ext}" in skip_exts:
+            return False
+        return True
+
+    def _should_skip_title(t: str) -> bool:
+        """跳过通用导航文本"""
+        t = t.strip().lower()
+        skip_words = {"home", "首页", "about", "关于", "contact", "联系",
+                      "login", "登录", "sign up", "注册", "search", "搜索",
+                      "back to top", "返回顶部", "edit", "编辑", "delete", "删除"}
+        if t in skip_words or len(t) < 3:
+            return True
+        return False
+
+    def _collect_links(container) -> list[tuple[str, str]]:
+        """从容器中提取链接"""
+        links = []
+        for a in container.iter("a"):
+            href = (a.get("href") or "").strip()
+            text = a.text_content().strip()
+            if _is_same_site(href) and not _should_skip_title(text):
+                full_url = urljoin(url, href)
+                if full_url not in seen_urls:
+                    seen_urls.add(full_url)
+                    links.append((text, full_url))
+        return links
+
+    # ── 策略1: nav 元素 ──
+    for nav in doc.iter("nav"):
+        links = _collect_links(nav)
+        # 也检查 nav 内的 ul/ol
+        for lst in nav.iter("ul"):
+            links.extend(_collect_links(lst))
+        for lst in nav.iter("ol"):
+            links.extend(_collect_links(lst))
+
+        if len(links) >= 3:
+            chapters = [{"title": t, "url": u} for t, u in links]
+            break
+
+    # ── 策略2: aside / sidebar ──
+    if len(chapters) < 3:
+        for aside in doc.iter("aside"):
+            links = _collect_links(aside)
+            if len(links) >= 3:
+                chapters = [{"title": t, "url": u} for t, u in links]
+                break
+
+    # ── 策略3: 带有 sidebar/nav/toc 类的元素 ──
+    if len(chapters) < 3:
+        sidebar_classes = ["sidebar", "nav", "toc", "menu", "table-of-contents",
+                           "side-nav", "side_nav", "docs-nav", "navigation"]
+        for cls in sidebar_classes:
+            for el in doc.find_class(cls):
+                links = _collect_links(el)
+                if len(links) >= 3:
+                    chapters = [{"title": t, "url": u} for t, u in links]
+                    break
+            if len(chapters) >= 3:
+                break
+
+    # ── 策略4: 大列表（深1-2级的 ul 中有多个跨页链接） ──
+    if len(chapters) < 3:
+        for ul in doc.iter("ul"):
+            links = _collect_links(ul)
+            if len(links) >= 5:
+                chapters = [{"title": t, "url": u} for t, u in links]
+                break
+
+    # 去重
+    seen = set()
+    unique = []
+    for ch in chapters:
+        key = ch["url"]
+        if key not in seen:
+            seen.add(key)
+            unique.append(ch)
+
+    return unique
