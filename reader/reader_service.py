@@ -387,50 +387,54 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
         """, (doc_id, collection_id, user_id, page_title, url))
         doc = _dict_row(cur, cur.fetchone())
 
-        # 下载所有图片到 MinIO，替换 HTML 中的 src
-        await _download_and_store_images(sections, doc_id)
+        # ── 检测是否有章节 ──
+        detected_chapters = result.get("detected_chapters", [])
+        has_chapters = bool(detected_chapters)
 
-        # 2. 逐章节逐段落写入
-        for sec_idx, sec in enumerate(sections):
-            sec_title = sec.get("title", f"第{sec_idx + 1}节")
-            paras = sec.get("paragraphs", [])
+        if not has_chapters:
+            # 无章节：正常存储主页内容
+            await _download_and_store_images(sections, doc_id)
 
-            for para_idx, para in enumerate(paras):
-                para_html = para.get("html", "")
-                para_text = para.get("text", "")
-                char_count = para.get("char_count", 0)
-                skip_translate = para.get("skip_translate", False)
+            for sec_idx, sec in enumerate(sections):
+                sec_title = sec.get("title", f"第{sec_idx + 1}节")
+                paras = sec.get("paragraphs", [])
 
-                # 写入 MinIO（失败则静默跳过，DB 有回退）
-                orig_key = _para_orig_key(doc_id, sec_idx, para_idx)
-                try:
-                    minio_put(
-                        f"{MINIO_BUCKET}/reader/{orig_key}",
-                        para_html.encode("utf-8"),
-                        "text/html; charset=utf-8",
-                    )
-                except Exception:
-                    orig_key = ""  # MinIO 不可用，标记为空
+                for para_idx, para in enumerate(paras):
+                    para_html = para.get("html", "")
+                    para_text = para.get("text", "")
+                    char_count = para.get("char_count", 0)
+                    skip_translate = para.get("skip_translate", False)
 
-                # 插入段落记录（html_content 作为 DB 回退）
-                cur.execute("""
-                    INSERT INTO sections
-                        (document_id, sec_index, paragraph_index, title,
-                         html_content_key, html_content, text_content,
-                         skip_translate, status, char_count)
-                    VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    doc_id, sec_idx, para_idx, sec_title,
-                    orig_key, para_html, para_text,
-                    skip_translate,
-                    "skip" if skip_translate else "wait",
-                    char_count,
-                ))
+                    # 写入 MinIO（失败则静默跳过，DB 有回退）
+                    orig_key = _para_orig_key(doc_id, sec_idx, para_idx)
+                    try:
+                        minio_put(
+                            f"{MINIO_BUCKET}/reader/{orig_key}",
+                            para_html.encode("utf-8"),
+                            "text/html; charset=utf-8",
+                        )
+                    except Exception:
+                        orig_key = ""  # MinIO 不可用，标记为空
 
-                total_chars += char_count
-                total_paragraphs += 1
+                    # 插入段落记录（html_content 作为 DB 回退）
+                    cur.execute("""
+                        INSERT INTO sections
+                            (document_id, sec_index, paragraph_index, title,
+                             html_content_key, html_content, text_content,
+                             skip_translate, status, char_count)
+                        VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        doc_id, sec_idx, para_idx, sec_title,
+                        orig_key, para_html, para_text,
+                        skip_translate,
+                        "skip" if skip_translate else "wait",
+                        char_count,
+                    ))
 
-            total_sections += 1
+                    total_chars += char_count
+                    total_paragraphs += 1
+
+                total_sections += 1
 
         # 3. 更新文档统计
         cur.execute("""
