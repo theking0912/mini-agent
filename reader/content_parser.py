@@ -351,10 +351,11 @@ def _resolve_urls(sections: list[dict], base_url: str):
 
     for sec in sections:
         for para in sec.get("paragraphs", []):
-            html = para.get("html", "")
-            if html:
-                html = _resolve_in_html(html, 'src')
-                html = _resolve_in_html(html, 'href')
-                para["html"] = html
-                # Also update text representation if needed
+            # 兼容 html / orig_html / trans_html 三种键名
+            for key in ('html', 'orig_html', 'trans_html'):
+                html = para.get(key, "")
+                if html:
+                    html = _resolve_in_html(html, 'src')
+                    html = _resolve_in_html(html, 'href')
+                    para[key] = html
                 para["char_count"] = len(para.get("text", ""))
