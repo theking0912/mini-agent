@@ -35,7 +35,7 @@ from tools import registry
 redis_client = get_redis()
 
 # ── MinIO 配置 ────────────────────────────────────────────────
-from core.storage import AVATAR_BUCKET, MINIO_ENDPOINT
+from core.storage import MINIO_BUCKET, MINIO_ENDPOINT
 
 # ── 应用 ──────────────────────────────────────────────────────
 app = FastAPI(title="Mini Agent Web UI")
@@ -415,13 +415,13 @@ async def upload_avatar(request: Request, file: UploadFile = File(...)):
         "image/webp": "webp", "image/svg+xml": "svg",
     }
     ext = ext_map[file.content_type]
-    obj_path = f"{AVATAR_BUCKET}/{u['id']}.{ext}"
+    obj_path = f"{MINIO_BUCKET}/avatars/{u['id']}.{ext}"
 
     # 先清理旧扩展名的头像文件
     for old_ext in ["png", "jpg", "jpeg", "gif", "webp", "svg"]:
         if old_ext == ext:
             continue
-        minio_delete(f"{AVATAR_BUCKET}/{u['id']}.{old_ext}")
+        minio_delete(f"{MINIO_BUCKET}/avatars/{u['id']}.{old_ext}")
 
     if not minio_put(obj_path, data, file.content_type):
         return JSONResponse({"error": "上传到 MinIO 失败"}, status_code=500)
@@ -606,6 +606,8 @@ async def translate(request: Request):
     engine = (data.get("engine") or "tencent").strip().lower()
     if engine not in ("tencent", "llm"):
         engine = "tencent"
+
+    print(f"[Translate] url={url[:60]} engine={engine} user={u['id']}")
 
     # 确定使用的模型和 Key（LLM 兜底用）
     api_key = (data.get("api_key") or "").strip()
@@ -818,6 +820,64 @@ async def reader_analyze(request: Request):
         return JSONResponse({"error": f"分析失败: {e}"}, status_code=500)
 
 
+# ── 批量导入章节 ──────────────────────────────────────────────
+
+@app.post("/api/reader/import-chapters/{doc_id}")
+async def reader_import_chapters(doc_id: str, request: Request):
+    """批量导入章节 URL。
+
+    mode='merge'（默认）→ 作为同一文档的章节追加
+    mode='separate'    → 每个 URL 作为独立文档
+    chapters: [{title, url}, ...]
+    """
+    from reader import import_chapters
+    u = require_user(request)
+    data = await request.json()
+    chapters = data.get("chapters", [])
+    mode = data.get("mode", "merge")
+    if not chapters:
+        return JSONResponse({"error": "章节列表不能为空"}, status_code=400)
+    if mode not in ("merge", "structure", "separate"):
+        return JSONResponse({"error": "mode 必须是 merge、structure 或 separate"}, status_code=400)
+    try:
+        result = await import_chapters(doc_id, u["id"], chapters, mode)
+        return result
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"导入失败: {e}"}, status_code=500)
+
+
+# ── 章节懒加载 ────────────────────────────────────────────────
+
+@app.post("/api/reader/fetch-chapter/{doc_id}/{sec_index}")
+async def reader_fetch_chapter(doc_id: str, sec_index: int, request: Request):
+    """懒加载单章内容：抓取 URL → 存 MinIO → 返回 HTML"""
+    from reader import lazy_fetch_chapter
+    u = require_user(request)
+    try:
+        result = await lazy_fetch_chapter(doc_id, sec_index)
+        if "error" in result:
+            return JSONResponse(result, status_code=404)
+        return result
+    except Exception as e:
+        return JSONResponse({"error": f"加载章节失败: {e}"}, status_code=500)
+
+
+# ── 文档章节列表（侧边栏用） ──────────────────────────────────
+
+@app.get("/api/reader/documents/{doc_id}/chapters")
+async def reader_document_chapters(doc_id: str, request: Request):
+    """获取文档的章节列表（侧边栏展示用）"""
+    from reader import get_document_chapters
+    u = require_user(request)
+    try:
+        chapters = get_document_chapters(doc_id, u["id"])
+        return chapters
+    except Exception as e:
+        return JSONResponse({"error": f"获取章节列表失败: {e}"}, status_code=500)
+
+
 # ── 阅读 ──────────────────────────────────────────────────────
 
 @app.get("/api/reader/read/{doc_id}")
@@ -829,6 +889,27 @@ async def reader_read(doc_id: str, request: Request):
     if sections is None:
         return JSONResponse({"error": "文档不存在或无权限"}, status_code=404)
     return {"sections": sections}
+
+
+# ── 章节 HTML 加载（懒加载） ──────────────────────────────────
+
+@app.get("/api/reader/section/{doc_id}/{sec_index}")
+async def reader_section_html(doc_id: str, sec_index: int, request: Request):
+    """获取单章 HTML 内容（从 MinIO 读取）"""
+    u = require_user(request)
+    from reader.reader_service import _chapter_html_key
+    from core.storage import minio_get
+    from core.storage import MINIO_BUCKET
+
+    minio_key = _chapter_html_key(doc_id, sec_index)
+    try:
+        data = minio_get(f"{MINIO_BUCKET}/reader/{minio_key}")
+        if data is None:
+            return JSONResponse({"error": "章节内容不存在"}, status_code=404)
+        html_content, content_type = data
+        return Response(content=html_content, media_type="text/html; charset=utf-8")
+    except Exception as e:
+        return JSONResponse({"error": f"读取章节失败: {e}"}, status_code=500)
 
 
 # ── 翻译 ──────────────────────────────────────────────────────
@@ -849,6 +930,8 @@ async def reader_translate(doc_id: str, request: Request):
     engine = (data.get("engine") or "tencent").strip().lower()
     if engine not in ("tencent", "llm"):
         engine = "tencent"
+
+    print(f"[ReaderTranslate] doc={doc_id} user={u['id']} engine={engine}")
 
     if not api_key or not base_url or not model:
         cfg = get_config()

@@ -12,7 +12,7 @@ from datetime import datetime as dt
 MINIO_ENDPOINT = "http://172.18.0.1:9000"
 MINIO_ACCESS_KEY = "leroy"
 MINIO_SECRET_KEY = "Leroy.Lee_09.12.24"
-AVATAR_BUCKET = "avatars"
+MINIO_BUCKET = "mini-agent"
 
 
 def _aws4_sign(

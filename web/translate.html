@@ -118,6 +118,38 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .btn-primary { background: var(--primary); color: white; }
 .btn-primary:hover { background: var(--primary-dim); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Translate Progress Button ── */
+.translate-progress {
+  position: relative;
+  overflow: hidden;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+  background: var(--primary);
+  color: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  height: 26px;
+}
+.translate-progress .tpf {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: rgba(255,255,255,.18);
+  width: 0%;
+  transition: width .25s ease;
+  pointer-events: none;
+}
+.translate-progress span {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
 .btn-outline {
   background: transparent;
   color: var(--text);
@@ -468,6 +500,134 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 }
 .dialog input:focus { border-color: var(--primary); }
 .dialog .btn-row { display: flex; gap: 6px; justify-content: flex-end; }
+
+/* ── Chapters dialog ── */
+.chapter-list {
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.chapter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .1s;
+}
+.chapter-item:last-child { border-bottom: none; }
+.chapter-item:hover { background: var(--surface2); }
+.chapter-item input[type="checkbox"] { flex-shrink: 0; }
+.chapter-item .ch-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-item .ch-url { color: var(--text3); font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-count { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.import-mode {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.import-mode label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.chapter-manual-row { display: flex; gap: 6px; margin: 8px 0; }
+.chapter-manual-row input { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 11px; outline: none; }
+.chapter-manual-row input:focus { border-color: var(--primary); }
+.chapter-manual-row .btn { padding: 4px 8px; font-size: 11px; }
+.chip-progress-text { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+
+/* ── Sidebar chapter items ── */
+.sidebar-chapter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 28px;
+  font-size: 11px;
+  color: var(--text2);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background .15s;
+}
+.sidebar-chapter:hover { background: var(--surface2); color: var(--text); }
+.sidebar-chapter.active { color: var(--primary); background: rgba(108,92,231,.08); }
+.sidebar-chapter .sch-icon { font-size: 10px; flex-shrink: 0; }
+.sidebar-chapter .sch-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-chapter .sch-loading { font-size: 10px; color: var(--text3); }
+.sidebar-chapter .sch-action { font-size: 10px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }
+.sidebar-chapter .sch-action:hover { background: var(--surface2); }
+.chapter-load-all {
+  display: block;
+  margin: 4px 10px 4px 28px;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--primary);
+  cursor: pointer;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  transition: background .15s;
+}
+.chapter-load-all:hover { background: var(--surface2); }
+.chapter-load-all.loading { opacity: .5; pointer-events: none; }
+.chapter-load-all .cla-progress { font-size: 10px; color: var(--text3); margin-left: 4px; }
+
+/* ── Chapter view in reader ── */
+.chapter-nav { padding: 10px 0; }
+.chapter-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.chapter-nav-item:hover { background: var(--surface2); border-color: var(--primary); }
+.chapter-nav-item.active { border-color: var(--primary); background: rgba(108,92,231,.1); }
+.chapter-nav-item .cnav-icon { font-size: 14px; flex-shrink: 0; }
+.chapter-nav-item .cnav-title { flex: 1; font-size: 13px; font-weight: 500; }
+.chapter-nav-item .cnav-arrow { color: var(--text3); font-size: 12px; }
+.chapter-nav-item:hover .cnav-arrow { color: var(--primary); }
+.chapter-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.chapter-title-label { font-size: 15px; font-weight: 700; color: var(--primary); }
+.chapter-content { line-height: 1.8; font-size: 14px; }
+.chapter-content h1, .chapter-content h2, .chapter-content h3,
+.chapter-content h4 { color: var(--primary); margin: 16px 0 8px; }
+.chapter-content p { margin: 8px 0; }
+.chapter-content pre { background: var(--surface2); padding: 12px 16px; border-radius: var(--radius-sm); overflow-x: auto; margin: 8px 0; }
+.chapter-content code { background: var(--surface2); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+.chapter-content pre code { background: none; padding: 0; }
+.chapter-content blockquote { border-left: 3px solid var(--primary); padding: 6px 12px; margin: 8px 0; color: var(--text2); background: rgba(108,92,231,.06); border-radius: 0 4px 4px 0; }
+.chapter-content ul, .chapter-content ol { padding-left: 20px; margin: 6px 0; }
+.chapter-content img { max-width: 100%; border-radius: var(--radius-sm); }
+.chapter-content table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.chapter-content td, .chapter-content th { border: 1px solid var(--border); padding: 6px 10px; }
+
+/* ── Chapter index ── */
+.chapter-index { padding: 10px 0; }
+
+.chapter-import-progress {
+  display: none;
+  margin-top: 8px;
+}
+.chapter-import-progress.show { display: block; }
+.chip-progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+.chip-progress-fill { height: 100%; background: var(--success); width: 0%; transition: width .3s ease; }
 </style>
 </head>
 <body>
@@ -513,7 +673,11 @@ header .nav .user { color: var(--text3); font-size: 11px; }
           <button class="btn active" data-view="interleaved" onclick="switchView('interleaved')">📄 交错</button>
           <button class="btn" data-view="sbs" onclick="switchView('sbs')">📑 左右</button>
         </div>
-        <button class="btn btn-primary btn-sm" id="translateBtn" onclick="startTranslate()" style="display:none">🌐 翻译</button>
+        <button class="btn btn-primary btn-sm" id="translateBtn" onclick="startTranslate()" style="display:none;position:relative;overflow:hidden">🌐 翻译</button>
+        <div class="translate-progress" id="translateProgress" style="display:none">
+          <div class="tpf" id="tpfFill"></div>
+          <span id="tpText">🌐 翻译</span>
+        </div>
         <select id="engineSelect" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 6px;font-size:11px;outline:none" onchange="onEngineChange()">
           <option value="tencent">⚡ 腾讯翻译</option>
           <option value="llm">🤖 大模型</option>
@@ -565,6 +729,36 @@ header .nav .user { color: var(--text3); font-size: 11px; }
       <button class="btn btn-outline btn-sm" onclick="closeTencentConfig()">取消</button>
       <button class="btn btn-outline btn-sm" onclick="deleteTencentConfig()">清除</button>
       <button class="btn btn-primary btn-sm" onclick="saveTencentConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chapters Import Dialog -->
+<div class="dialog-overlay" id="chaptersDialog">
+  <div class="dialog" style="min-width:420px;max-width:520px">
+    <h3>📑 检测到多章节文档</h3>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:8px">
+      当前页面包含指向其他章节的链接。请选择要导入的章节：
+    </p>
+    <div class="chapter-count" id="chaptersCount"></div>
+    <div class="chapter-list" id="chaptersList"></div>
+    <div class="chapter-manual-row">
+      <input type="url" id="manualChapterUrl" placeholder="手动添加章节 URL...">
+      <button class="btn btn-outline btn-xs" onclick="addManualChapter()">➕ 添加</button>
+    </div>
+    <div class="import-mode" id="importModeGroup">
+      <label><input type="radio" name="importMode" value="merge"> 全量导入（一次性下载全部）</label>
+      <label><input type="radio" name="importMode" value="structure" checked> 仅加载结构（按需手动加载）</label>
+      <label><input type="radio" name="importMode" value="separate"> 每章作为独立文档</label>
+    </div>
+    <div id="chaptersMsg" class="msg"></div>
+    <div class="chapter-import-progress" id="chaptersProgress">
+      <div class="chip-progress-text" id="chipProgText"></div>
+      <div class="chip-progress-bar"><div class="chip-progress-fill" id="chipProgFill"></div></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-sm" onclick="closeChaptersDialog()">取消</button>
+      <button class="btn btn-primary btn-sm" id="importChaptersBtn" onclick="startImportChapters()">📥 导入选中章节</button>
     </div>
   </div>
 </div>
@@ -648,9 +842,211 @@ function hideProgress() {
   document.getElementById('progressFill').style.width = '0%';
 }
 
+
 // ══════════════════════════════════════════════════════════════
-// Bookshelf
+// Chapters Import
 // ══════════════════════════════════════════════════════════════
+
+let currentChaptersDocId = null;
+let currentDetectedChapters = [];
+
+function showChaptersDialog(chapters, docId) {
+  if (!chapters || !Array.isArray(chapters) || chapters.length === 0) return;
+  
+  currentChaptersDocId = docId;
+  currentDetectedChapters = chapters.slice();
+
+  const list = document.getElementById('chaptersList');
+  list.innerHTML = '';
+  chapters.forEach((ch, i) => {
+    const title = ch && ch.title ? ch.title : (ch && ch.url ? ch.url.split('/').pop().replace(/[-_]/g, ' ') : '章节 ' + (i+1));
+    const url = ch && ch.url ? ch.url : '';
+    const item = document.createElement('div');
+    item.className = 'chapter-item';
+    item.innerHTML = `
+      <input type="checkbox" checked data-idx="${i}">
+      <span class="ch-title">${escapeHtml(title)}</span>
+      <span class="ch-url">${escapeHtml(url)}</span>
+    `;
+    item.style.display = 'flex';
+    // Toggle checkbox on click (but not on the checkbox itself)
+    item.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') {
+        const cb = item.querySelector('input[type="checkbox"]');
+        cb.checked = !cb.checked;
+      }
+    });
+    list.appendChild(item);
+  });
+
+  document.getElementById('chaptersCount').textContent = `共 ${chapters.length} 个章节`;
+  document.getElementById('chaptersMsg').className = 'msg';
+  document.getElementById('chaptersProgress').classList.remove('show');
+  document.getElementById('importChaptersBtn').disabled = false;
+  document.getElementById('importChaptersBtn').textContent = '📥 导入选中章节';
+  document.getElementById('chaptersDialog').classList.add('show');
+}
+
+function closeChaptersDialog() {
+  document.getElementById('chaptersDialog').classList.remove('show');
+}
+
+function addManualChapter() {
+  const input = document.getElementById('manualChapterUrl');
+  const url = input.value.trim();
+  if (!url) return;
+
+  // Extract a title from the URL
+  const title = url.split('/').pop().replace(/[-_]/g, ' ') || url;
+  const chapters = currentDetectedChapters;
+
+  // Check for duplicates
+  if (chapters.some(c => c.url === url)) {
+    showMsg(document.getElementById('chaptersMsg'), '该 URL 已在列表中', 'warn', 3000);
+    return;
+  }
+
+  chapters.push({title: title, url: url});
+  input.value = '';
+
+  // Re-render
+  const list = document.getElementById('chaptersList');
+  const item = document.createElement('div');
+  item.className = 'chapter-item';
+  const idx = chapters.length - 1;
+  item.innerHTML = `
+    <input type="checkbox" checked data-idx="${idx}">
+    <span class="ch-title">${escapeHtml(title)}</span>
+    <span class="ch-url">${escapeHtml(url)}</span>
+  `;
+  item.addEventListener('click', (e) => {
+    if (e.target.tagName !== 'INPUT') {
+      const cb = item.querySelector('input[type="checkbox"]');
+      cb.checked = !cb.checked;
+    }
+  });
+  list.appendChild(item);
+
+  document.getElementById('chaptersCount').textContent = `共 ${chapters.length} 个章节`;
+  showMsg(document.getElementById('chaptersMsg'), `✅ 已添加: ${escapeHtml(title)}`, 'success', 2000);
+}
+
+async function startImportChapters() {
+  const chapters = currentDetectedChapters;
+  const checkboxes = document.querySelectorAll('#chaptersList input[type="checkbox"]');
+  const selected = [];
+  checkboxes.forEach((cb, i) => {
+    if (cb.checked && chapters[i]) {
+      selected.push(chapters[i]);
+    }
+  });
+
+  if (selected.length === 0) {
+    showMsg(document.getElementById('chaptersMsg'), '请至少选择一个章节', 'warn', 3000);
+    return;
+  }
+
+  const mode = document.querySelector('input[name="importMode"]:checked').value;
+  const btn = document.getElementById('importChaptersBtn');
+  btn.disabled = true;
+
+  const prog = document.getElementById('chaptersProgress');
+  prog.classList.add('show');
+
+  if (mode === 'structure') {
+    btn.textContent = '⏳ 保存章节结构...';
+    document.getElementById('chipProgText').textContent = `0/${selected.length}`;
+    document.getElementById('chipProgFill').style.width = '0%';
+
+    try {
+      const result = await fetchApi(`/api/reader/import-chapters/${currentChaptersDocId}`, {
+        method: 'POST',
+        body: JSON.stringify({chapters: selected, mode: 'structure'}),
+      });
+
+      if (result.error) {
+        showMsg(document.getElementById('chaptersMsg'), '❌ ' + result.error, 'error');
+        return;
+      }
+
+      const total = result.total || selected.length;
+      const succeeded = result.succeeded || 0;
+      document.getElementById('chipProgText').textContent = `${succeeded}/${total}`;
+      document.getElementById('chipProgFill').style.width = '100%';
+
+      showMsg(document.getElementById('chaptersMsg'), `✅ 章节结构已保存（${succeeded} 个），点击章节即可加载内容`, 'success');
+
+      btn.textContent = '✅ 完成';
+      btn.disabled = false;
+
+      // Refresh sidebar - document now has chapters
+      await loadCollections();
+
+      // Auto-close dialog and show the document with chapters
+      closeChaptersDialog();
+      await selectDocument(currentChaptersDocId);
+
+    } catch (e) {
+      showMsg(document.getElementById('chaptersMsg'), '❌ 保存失败: ' + e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = '📥 导入选中章节';
+    }
+    return;
+  }
+
+  // merge mode - use existing flow with progress bar
+  btn.textContent = '⏳ 全量导入中...';
+  document.getElementById('chipProgText').textContent = `0/${selected.length}`;
+  document.getElementById('chipProgFill').style.width = '0%';
+
+  try {
+    const result = await fetchApi(`/api/reader/import-chapters/${currentChaptersDocId}`, {
+      method: 'POST',
+      body: JSON.stringify({chapters: selected, mode: mode}),
+    });
+
+    if (result.error) {
+      showMsg(document.getElementById('chaptersMsg'), '❌ ' + result.error, 'error');
+      return;
+    }
+
+    const total = result.total || selected.length;
+    const succeeded = result.succeeded || 0;
+    const failed = result.failed || [];
+
+    document.getElementById('chipProgText').textContent = `${succeeded}/${total}`;
+    document.getElementById('chipProgFill').style.width = `${(succeeded / total) * 100}%`;
+
+    let msg = `✅ 导入完成：成功 ${succeeded}/${total}`;
+    if (failed.length > 0) {
+      msg += `，失败 ${failed.length}`;
+    }
+    showMsg(document.getElementById('chaptersMsg'), msg, succeeded > 0 ? 'success' : 'error');
+
+    if (succeeded > 0) {
+      // Refresh sidebar
+      await loadCollections();
+
+      if (mode === 'merge') {
+        // Re-select the current doc (which now has more sections)
+        await selectDocument(currentChaptersDocId);
+      }
+    }
+
+    btn.textContent = '✅ 完成';
+    // Close after 2s if all succeeded
+    if (failed.length === 0) {
+      setTimeout(closeChaptersDialog, 2000);
+    }
+  } catch (e) {
+    showMsg(document.getElementById('chaptersMsg'), '❌ 导入失败: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '📥 导入选中章节';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// View toggle
 
 async function loadCollections() {
   try {
@@ -746,6 +1142,9 @@ async function loadDocItems(collectionId, container, retries) {
       `;
       item.addEventListener('click', () => selectDocument(doc.id));
       container.appendChild(item);
+
+      // Also load chapters for this doc in sidebar
+      loadSidebarChapters(doc.id, item);
     });
   } catch (e) {
     if (retries < 3) {
@@ -756,6 +1155,119 @@ async function loadDocItems(collectionId, container, retries) {
 
 function refreshSidebar() {
   loadCollections();
+}
+
+// ── Sidebar chapters ─────────────────────────────────────
+
+/** Load chapters for a document and render them in the sidebar */
+async function loadSidebarChapters(docId, docItem) {
+  // Remove previous chapter list if any
+  const oldChapters = docItem.querySelector('.sidebar-chapters');
+  if (oldChapters) oldChapters.remove();
+
+  try {
+    const data = await fetchApi('/api/reader/documents/' + encodeURIComponent(docId) + '/chapters');
+    if (!data || data.error || !data.chapters || data.chapters.length <= 1) return;
+
+    // Only show chapters if there are multiple or if it's a chapter-mode doc
+    const container = document.createElement('div');
+    container.className = 'sidebar-chapters';
+
+    // Count pending chapters
+    const pendingChap = data.chapters.filter(c => !c.has_content);
+    const loadedChap = data.chapters.filter(c => c.has_content);
+
+    data.chapters.forEach((ch, idx) => {
+      const chItem = document.createElement('div');
+      chItem.className = 'sidebar-chapter' + (ch.has_content ? ' loaded' : ' pending');
+      chItem.dataset.secIdx = ch.sec_index;
+      const icon = ch.has_content ? '📄' : '🔗';
+      const statusText = ch.has_content ? '' : '<span class="sch-action" title="点击加载">⬇</span>';
+      chItem.innerHTML = `
+        <span class="sch-icon">${icon}</span>
+        <span class="sch-title">${escapeHtml(ch.title)}</span>
+        ${statusText}
+      `;
+      // Click always loads content
+      chItem.addEventListener('click', () => {
+        if (currentDocId === docId) {
+          loadChapterContent(ch.sec_index);
+        }
+        // Select the document first if not currently viewed
+        if (currentDocId !== docId) {
+          selectDocument(docId).then(() => loadChapterContent(ch.sec_index));
+        }
+      });
+      container.appendChild(chItem);
+    });
+
+    // "全量加载" button (only if there are pending chapters)
+    if (pendingChap.length > 0) {
+      const loadAll = document.createElement('div');
+      loadAll.className = 'chapter-load-all';
+      loadAll.id = 'loadAllBtn_' + docId.replace(/-/g, '_');
+      loadAll.innerHTML = `⬇ 全量加载剩余 ${pendingChap.length} 章`;
+      loadAll.addEventListener('click', () => loadAllPendingChapters(docId, loadAll, data.chapters));
+      container.appendChild(loadAll);
+    }
+
+    docItem.appendChild(container);
+  } catch (e) {
+    console.error('Load sidebar chapters failed:', e);
+  }
+}
+
+/** Update a sidebar chapter's status after lazy fetch */
+function updateSidebarChapterStatus(secIdx, hasContent) {
+  const chItems = document.querySelectorAll('.sidebar-chapter');
+  chItems.forEach(el => {
+    if (parseInt(el.dataset.secIdx) === secIdx) {
+      el.classList.remove('pending');
+      el.classList.add('loaded');
+      el.querySelector('.sch-icon').textContent = '📄';
+      const action = el.querySelector('.sch-action');
+      if (action) action.remove();
+    }
+  });
+}
+
+/** Load ALL pending chapters sequentially with progress */
+async function loadAllPendingChapters(docId, loadAllBtn, allChapters) {
+  if (loadAllBtn.classList.contains('loading')) return;
+  loadAllBtn.classList.add('loading');
+
+  const pending = allChapters.filter(c => !c.has_content);
+  const total = pending.length;
+  let done = 0;
+  let failed = 0;
+
+  loadAllBtn.innerHTML = `⏳ 加载中 0/${total}`;
+
+  for (const ch of pending) {
+    try {
+      const res = await fetch('/api/reader/fetch-chapter/' + encodeURIComponent(docId) + '/' + ch.sec_index, {
+        method: 'POST',
+        headers: {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'},
+      });
+      if (res.ok) {
+        done++;
+        updateSidebarChapterStatus(ch.sec_index, true);
+      } else {
+        failed++;
+      }
+    } catch (e) {
+      failed++;
+    }
+    loadAllBtn.innerHTML = `⏳ 加载中 ${done}/${total}`;
+  }
+
+  if (failed === 0) {
+    loadAllBtn.innerHTML = `✅ 已加载全部 ${total} 章`;
+    setTimeout(() => { loadAllBtn.remove(); }, 3000);
+  } else {
+    loadAllBtn.innerHTML = `✅ ${done}/${total} 加载完成，${failed} 失败`;
+    loadAllBtn.classList.remove('loading');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -799,6 +1311,10 @@ async function selectDocument(docId) {
     document.getElementById('tencentConfigBtn').style.display = '';
 
     renderReader();
+
+    // Refresh sidebar chapters for this doc
+    const docItem = document.querySelector(`.doc-item[data-doc-id="${docId}"]`);
+    if (docItem) loadSidebarChapters(docId, docItem);
   } catch (e) {
     showReaderError('加载失败: ' + e.message);
   }
@@ -834,6 +1350,144 @@ function renderReader() {
   const reader = document.getElementById('readerContent');
   reader.innerHTML = '';
 
+  // Check if this is a chapter-mode document (has source_url sections)
+  const isChapterMode = currentDocData.some(sec => sec.chapter_mode);
+
+  if (isChapterMode) {
+    renderChapterMode(reader);
+  } else {
+    renderNormalMode(reader);
+  }
+}
+
+function renderChapterMode(reader) {
+  // Show all chapter titles as a navigable list
+  // Click to load content from API
+  reader.innerHTML = '<div class="chapter-index"><div style="font-size:13px;color:var(--text2);margin-bottom:12px;font-weight:600">📑 选择章节</div></div>';
+  const list = reader.querySelector('.chapter-index');
+
+  currentDocData.forEach((sec, secIdx) => {
+    const item = document.createElement('div');
+    item.className = 'chapter-nav-item';
+    item.dataset.secIdx = secIdx;
+    item.innerHTML = `
+      <span class="cnav-icon">📄</span>
+      <span class="cnav-title">${escapeHtml(sec.title || '第 ' + (secIdx + 1) + ' 节')}</span>
+      <span class="cnav-arrow">→</span>
+    `;
+    item.addEventListener('click', () => loadChapterContent(secIdx));
+    list.appendChild(item);
+  });
+}
+
+let currentChapterIndex = null;
+
+async function loadChapterContent(secIdx) {
+  const sec = currentDocData[secIdx];
+  if (!sec) return;
+
+  const reader = document.getElementById('readerContent');
+
+  // Highlight active chapter nav items
+  document.querySelectorAll('.chapter-nav-item').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.secIdx) === secIdx);
+  });
+
+  // Check if this is a pending chapter (structure mode - needs fetch)
+  const needsFetch = sec.chapter_mode && (!sec.paragraphs || sec.paragraphs.length === 0 || sec.paragraphs.every(p => !p.orig_html));
+
+  if (needsFetch) {
+    // Show loading + fetch from API
+    reader.innerHTML = `<div class="loading-indicator"><div class="spinner"></div><span>正在抓取章节内容...</span></div>`;
+
+    try {
+      const res = await fetch('/api/reader/fetch-chapter/' + encodeURIComponent(currentDocId) + '/' + secIdx, {
+        method: 'POST',
+        headers: {'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json'},
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        reader.innerHTML = `<div class="empty-state"><div class="icon" style="font-size:32px">❌</div><p>${escapeHtml(err.error || '加载失败')}</p></div>`;
+        return;
+      }
+      const data = await res.json();
+
+      // Render the chapter content
+      reader.innerHTML = `
+        <div class="chapter-topbar">
+          <button class="btn btn-outline btn-xs" onclick="showChapterIndex()">← 返回目录</button>
+          <span class="chapter-title-label">${escapeHtml(data.title || sec.title)}</span>
+        </div>
+        <div class="chapter-content">${data.html}</div>
+      `;
+
+      currentChapterIndex = secIdx;
+      document.getElementById('docTitle').textContent = data.title || sec.title || '章节';
+
+      // Update sidebar - mark this chapter as loaded
+      updateSidebarChapterStatus(secIdx, true);
+      return;
+    } catch (e) {
+      reader.innerHTML = `<div class="empty-state"><div class="icon" style="font-size:32px">❌</div><p>加载失败: ${escapeHtml(e.message)}</p></div>`;
+      return;
+    }
+  }
+
+  // Already has content - load from existing data or section endpoint
+  reader.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>加载章节...</span></div>';
+
+  // Highlight in sidebar too
+  document.querySelectorAll('.sidebar-chapter').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.secIdx) === secIdx);
+  });
+
+  try {
+    // Try reading from the paragraph content first
+    const origHtml = sec.paragraphs && sec.paragraphs[0] && sec.paragraphs[0].orig_html;
+    if (origHtml) {
+      reader.innerHTML = `
+        <div class="chapter-topbar">
+          <button class="btn btn-outline btn-xs" onclick="showChapterIndex()">← 返回目录</button>
+          <span class="chapter-title-label">${escapeHtml(sec.title)}</span>
+        </div>
+        <div class="chapter-content">${origHtml}</div>
+      `;
+      currentChapterIndex = secIdx;
+      document.getElementById('docTitle').textContent = sec.title || '章节';
+      return;
+    }
+
+    // Fallback: try section API
+    const res = await fetch('/api/reader/section/' + encodeURIComponent(currentDocId) + '/' + secIdx, {
+      headers: {'Authorization': 'Bearer ' + TOKEN},
+    });
+    if (!res.ok) {
+      reader.innerHTML = `<div class="empty-state"><div class="icon" style="font-size:32px">❌</div><p>加载失败: ${res.status}</p></div>`;
+      return;
+    }
+    const html = await res.text();
+
+    reader.innerHTML = `
+      <div class="chapter-topbar">
+        <button class="btn btn-outline btn-xs" onclick="showChapterIndex()">← 返回目录</button>
+        <span class="chapter-title-label">${escapeHtml(sec.title)}</span>
+      </div>
+      <div class="chapter-content">${html}</div>
+    `;
+
+    currentChapterIndex = secIdx;
+    document.getElementById('docTitle').textContent = sec.title || '章节';
+  } catch (e) {
+    reader.innerHTML = `<div class="empty-state"><div class="icon" style="font-size:32px">❌</div><p>加载失败: ${escapeHtml(e.message)}</p></div>`;
+  }
+}
+
+function showChapterIndex() {
+  currentChapterIndex = null;
+  renderReader();
+}
+
+function renderNormalMode(reader) {
   currentDocData.forEach((sec, secIdx) => {
     // Section heading
     const heading = document.createElement('div');
@@ -858,6 +1512,7 @@ function renderReader() {
     });
   });
 }
+
 
 function renderInterleaved(block, para, secIdx, pIdx) {
   // Skip translate = code block, show just once
@@ -1013,6 +1668,13 @@ async function analyzeUrl(colId) {
     }
     // Auto-select the new document
     selectDocument(data.document.id);
+
+    // If detected chapters, show import dialog
+    const chapters = data.document && data.document.detected_chapters;
+    console.log('[Chapters] detected:', chapters ? chapters.length : 0, chapters ? chapters.slice(0, 2) : []);
+    if (chapters && Array.isArray(chapters) && chapters.length > 0) {
+      showChaptersDialog(chapters, data.document.id);
+    }
   } catch (e) {
     showMsg(document.getElementById('sidebarMsg'), '❌ 分析失败: ' + e.message, 'error');
   } finally {
@@ -1028,13 +1690,22 @@ async function analyzeUrl(colId) {
 async function startTranslate() {
   if (translating || !currentDocId) return;
   translating = true;
-  const btn = document.getElementById('translateBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ 翻译中...';
-
-  showProgress(0);
 
   const engine = document.getElementById('engineSelect').value;
+  console.log(`[Translate] engine=${engine}, doc=${currentDocId}`);
+
+  // Switch to progress button
+  const btn = document.getElementById('translateBtn');
+  const prog = document.getElementById('translateProgress');
+  const tpf = document.getElementById('tpfFill');
+  const tpText = document.getElementById('tpText');
+  btn.style.display = 'none';
+  prog.style.display = 'inline-flex';
+  tpf.style.width = '0%';
+  tpText.textContent = '⏳ 翻译中...';
+
+  // Also show the old progress bar for reference
+  showProgress(0);
 
   try {
     const res = await fetch('/api/reader/translate/' + encodeURIComponent(currentDocId), {
@@ -1079,12 +1750,17 @@ async function startTranslate() {
           }
           if (event.type === 'para_done') {
             done++;
-            showProgress(Math.round((done / total) * 100));
+            const pct = Math.round((done / total) * 100);
+            showProgress(pct);
+            tpf.style.width = pct + '%';
+            tpText.textContent = `🌐 ${done}/${total}`;
           }
           if (event.type === 'all_done') {
             done = event.done || done;
             total = event.total || total;
             showProgress(100);
+            tpf.style.width = '100%';
+            tpText.textContent = `✅ ${done}/${total}`;
           }
         } catch (e) {}
       }
@@ -1100,8 +1776,8 @@ async function startTranslate() {
     showMsg(document.getElementById('sidebarMsg'), '❌ 翻译失败: ' + e.message, 'error');
   } finally {
     translating = false;
-    btn.disabled = false;
-    btn.textContent = '🌐 翻译';
+    prog.style.display = 'none';
+    btn.style.display = '';
     setTimeout(hideProgress, 2000);
   }
 }

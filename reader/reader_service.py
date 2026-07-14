@@ -19,7 +19,7 @@ from core.storage import minio_get, minio_put
 from .content_parser import analyze_url as _analyze_url
 
 # ── MinIO 配置 ────────────────────────────────────────────────
-READER_BUCKET = "reader"
+from core.storage import MINIO_BUCKET
 
 
 def _ensure_bucket():
@@ -27,11 +27,11 @@ def _ensure_bucket():
     from core.storage import MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
     import urllib.request
     try:
-        req = urllib.request.Request(f"{MINIO_ENDPOINT}/{READER_BUCKET}/", method="PUT", data=b"")
+        req = urllib.request.Request(f"{MINIO_ENDPOINT}/{MINIO_BUCKET}/reader/", method="PUT", data=b"")
         req.add_header("User-Agent", "MiniAgent/1.0")
         # 用同样的 AWS4 签名
         from core.storage import _aws4_sign
-        headers = _aws4_sign("PUT", f"{READER_BUCKET}/", b"", "application/octet-stream")
+        headers = _aws4_sign("PUT", f"{MINIO_BUCKET}/reader/", b"", "application/octet-stream")
         for k, v in headers.items():
             req.add_header(k, v)
         urllib.request.urlopen(req, timeout=5)
@@ -55,6 +55,11 @@ def _para_orig_key(doc_id: str, sec_i: int, para_i: int) -> str:
 def _para_trans_key(doc_id: str, sec_i: int, para_i: int) -> str:
     """译文段落的 MinIO key"""
     return f"{doc_id}/s{sec_i}_p{para_i}_trans.html"
+
+
+def _chapter_html_key(doc_id: str, sec_i: int) -> str:
+    """整章 HTML 内容的 MinIO key"""
+    return f"{doc_id}/ch{sec_i}.html"
 
 
 # ── 辅助 ──────────────────────────────────────────────────────
@@ -220,9 +225,9 @@ def delete_document(doc_id: str, user_id: int) -> bool:
                 try:
                     from core.storage import minio_delete
                     if orig_key:
-                        minio_delete(f"{READER_BUCKET}/{orig_key}")
+                        minio_delete(f"{MINIO_BUCKET}/reader/{orig_key}")
                     if trans_key:
-                        minio_delete(f"{READER_BUCKET}/{trans_key}")
+                        minio_delete(f"{MINIO_BUCKET}/reader/{trans_key}")
                 except Exception:
                     pass
 
@@ -365,7 +370,7 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
                 orig_key = _para_orig_key(doc_id, sec_idx, para_idx)
                 try:
                     minio_put(
-                        f"{READER_BUCKET}/{orig_key}",
+                        f"{MINIO_BUCKET}/reader/{orig_key}",
                         para_html.encode("utf-8"),
                         "text/html; charset=utf-8",
                     )
@@ -405,6 +410,7 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
         doc["total_sections"] = total_sections
         doc["total_paragraphs"] = total_paragraphs
         doc["sections_done"] = 0
+        doc["detected_chapters"] = result.get("detected_chapters", [])
 
     except Exception:
         conn.rollback()
@@ -545,6 +551,364 @@ async def merge_to_document(doc_id: str, user_id: int, url: str) -> dict:
 
 
 # ══════════════════════════════════════════════════════════════
+# 批量导入章节
+# ══════════════════════════════════════════════════════════════
+
+async def import_chapters(
+    doc_id: str, user_id: int, chapters: list[dict], mode: str = "merge"
+) -> dict:
+    """批量导入章节 URL 到文档。
+
+    mode='merge'      → 每个 URL 作为新 section 追加到同一个文档（全量加载）
+    mode='structure'  → 只保存章节元数据（标题+URL），不抓取内容，按需加载
+    mode='separate'   → 每个 URL 作为独立文档（放在同个书架）
+
+    返回: {mode, total, succeeded, failed: [{url, error}], results: [...]}
+    """
+    if mode == "merge":
+        return await _import_chapters_merge(doc_id, user_id, chapters)
+    elif mode == "structure":
+        return _import_chapters_structure(doc_id, chapters)
+    else:
+        return await _import_chapters_separate(doc_id, user_id, chapters)
+
+
+def _import_chapters_structure(doc_id: str, chapters: list[dict]) -> dict:
+    """结构模式：只保存章节标题和 URL，不抓取内容"""
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT COALESCE(MAX(sec_index), -1) + 1 AS next_sec FROM sections WHERE document_id = %s::uuid",
+            (doc_id,))
+        row = cur.fetchone()
+        next_sec = row["next_sec"] if row else 0
+
+        succeeded = 0
+        results = []
+        for ch in chapters:
+            title = ch.get("title", "")
+            url = ch.get("url", "")
+            sec_idx = next_sec
+            next_sec += 1
+
+            cur.execute("""
+                INSERT INTO sections
+                    (document_id, sec_index, paragraph_index, title,
+                     html_content_key, text_content, source_url,
+                     skip_translate, status, char_count)
+                VALUES (%s::uuid, %s, 0, %s, '', '', %s, false, 'pending', 0)
+            """, (doc_id, sec_idx, title, url))
+
+            # 更新文档统计
+            cur.execute("""
+                UPDATE documents SET
+                    total_sections = COALESCE(total_sections, 0) + 1,
+                    updated_at = NOW()
+                WHERE id = %s::uuid
+            """, (doc_id,))
+
+            succeeded += 1
+            results.append({
+                "title": title, "url": url, "status": "ok",
+                "sec_index": sec_idx, "char_count": 0,
+            })
+
+        return {
+            "mode": "structure",
+            "doc_id": doc_id,
+            "total": len(chapters),
+            "succeeded": succeeded,
+            "failed": [],
+            "results": results,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+async def lazy_fetch_chapter(doc_id: str, sec_index: int) -> dict:
+    """懒加载章节：获取 pending 章节的内容，存储到 MinIO，更新 DB
+
+    返回: {title, source_url, html, status}
+    """
+    from reader.content_parser import fetch_url
+    from lxml import html as lxml_html, etree
+    from core.storage import minio_put
+
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT id, title, source_url, html_content_key, status
+            FROM sections
+            WHERE document_id = %s::uuid AND sec_index = %s
+        """, (doc_id, sec_index))
+        row = cur.fetchone()
+        if not row:
+            return {"error": "章节不存在"}
+
+        # 如果已经有内容，直接返回
+        if row["html_content_key"] or row.get("status") == "done":
+            html_key = row["html_content_key"] or ""
+            if html_key:
+                from core.storage import minio_get
+                data = minio_get(f"{MINIO_BUCKET}/reader/{html_key}")
+                if data:
+                    return {
+                        "title": row["title"],
+                        "source_url": row.get("source_url") or "",
+                        "html": data[0].decode("utf-8", errors="replace"),
+                        "status": "done",
+                    }
+            return {"error": "章节内容不存在"}
+
+        # 抓取内容
+        source_url = row.get("source_url") or ""
+        if not source_url:
+            return {"error": "章节没有来源 URL"}
+
+        html_text = await fetch_url(source_url)
+        doc = lxml_html.fromstring(html_text)
+
+        from reader.content_parser import _find_main
+        main_el = _find_main(doc)
+        if main_el is None:
+            raise ValueError("未能提取到内容")
+
+        chapter_html = etree.tostring(main_el, encoding="unicode", method="html")
+        chapter_html = re.sub(r"\n\s*\n", "\n", chapter_html).strip()
+        char_count = len(chapter_html)
+
+        # 存 MinIO
+        minio_key = _chapter_html_key(doc_id, sec_index)
+        minio_put(
+            f"{MINIO_BUCKET}/reader/{minio_key}",
+            chapter_html.encode("utf-8"),
+            "text/html; charset=utf-8",
+        )
+
+        # 更新 DB
+        cur.execute("""
+            UPDATE sections SET
+                html_content_key = %s,
+                char_count = %s,
+                status = 'imported'
+            WHERE id = %s
+        """, (minio_key, char_count, row["id"]))
+
+        cur.execute("""
+            UPDATE documents SET
+                total_chars = COALESCE(total_chars, 0) + %s,
+                updated_at = NOW()
+            WHERE id = %s::uuid
+        """, (char_count, doc_id))
+
+        return {
+            "title": row["title"],
+            "source_url": source_url,
+            "html": chapter_html,
+            "status": "imported",
+            "sec_index": sec_index,
+            "char_count": char_count,
+        }
+    except Exception as e:
+        return {"error": f"懒加载章节失败: {e}"}
+    finally:
+        cur.close()
+        conn.close()
+
+
+async def _import_chapters_merge(doc_id: str, user_id: int, chapters: list[dict]) -> dict:
+    """合并模式：每章内容存为单个 MinIO HTML blob，DB 只存元数据"""
+    from reader.content_parser import fetch_url
+    from lxml import html as lxml_html, etree
+    from core.storage import minio_put
+
+    total = len(chapters)
+    succeeded = 0
+    failed = []
+    results = []
+
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT COALESCE(MAX(sec_index), -1) + 1 AS next_sec FROM sections WHERE document_id = %s::uuid",
+            (doc_id,))
+        row = cur.fetchone()
+        next_sec = row["next_sec"] if row else 0
+
+        for ch in chapters:
+            title = ch.get("title", "")
+            url = ch.get("url", "")
+            sec_idx = next_sec
+            next_sec += 1
+
+            try:
+                html_text = await fetch_url(url)
+                doc = lxml_html.fromstring(html_text)
+
+                # 提取主内容
+                from reader.content_parser import _find_main
+                main_el = _find_main(doc)
+                if main_el is None:
+                    raise ValueError("未能提取到内容")
+
+                # 序列化为完整 HTML
+                chapter_html = etree.tostring(main_el, encoding="unicode", method="html")
+                chapter_html = re.sub(r"\n\s*\n", "\n", chapter_html).strip()
+                char_count = len(chapter_html)
+
+                # 存 MinIO
+                minio_key = _chapter_html_key(doc_id, sec_idx)
+                minio_put(
+                    f"{MINIO_BUCKET}/reader/{minio_key}",
+                    chapter_html.encode("utf-8"),
+                    "text/html; charset=utf-8",
+                )
+
+                # 存 DB（一行一节）
+                cur.execute("""
+                    INSERT INTO sections
+                        (document_id, sec_index, paragraph_index, title,
+                         html_content_key, text_content, source_url,
+                         skip_translate, status, char_count)
+                    VALUES (%s::uuid, %s, 0, %s, %s, %s, %s, false, %s, %s)
+                """, (doc_id, sec_idx, title,
+                      minio_key, title, url,
+                      'imported', char_count))
+
+                # 更新文档统计
+                cur.execute("""
+                    UPDATE documents SET
+                        total_chars = COALESCE(total_chars, 0) + %s,
+                        total_sections = COALESCE(total_sections, 0) + 1,
+                        updated_at = NOW()
+                    WHERE id = %s::uuid
+                """, (char_count, doc_id))
+
+                succeeded += 1
+                results.append({
+                    "title": title, "url": url, "status": "ok",
+                    "sec_index": sec_idx, "char_count": char_count,
+                })
+
+            except Exception as e:
+                failed.append({"title": title, "url": url, "error": str(e)})
+                results.append({"title": title, "url": url, "status": "error", "error": str(e)})
+
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+    return {
+        "mode": "merge",
+        "doc_id": doc_id,
+        "total": total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "results": results,
+    }
+
+
+async def _import_chapters_separate(doc_id: str, user_id: int, chapters: list[dict]) -> dict:
+    """独立模式：每个章节作为独立文档"""
+    # 获取原始文档的书架 ID
+    conn = get_conn_sync()
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            "SELECT collection_id FROM documents WHERE id = %s::uuid AND user_id = %s",
+            (doc_id, user_id),
+        )
+        doc = cur.fetchone()
+        collection_id = doc["collection_id"] if doc else None
+        cur.close()
+    finally:
+        conn.close()
+
+    total = len(chapters)
+    succeeded = 0
+    failed = []
+    results = []
+
+    for ch in chapters:
+        title = ch.get("title", "")
+        url = ch.get("url", "")
+        try:
+            doc_result = await analyze_and_store(url, user_id, collection_id)
+            succeeded += 1
+            results.append({
+                "title": title,
+                "url": url,
+                "status": "ok",
+                "doc_id": doc_result.get("id"),
+            })
+        except Exception as e:
+            failed.append({"title": title, "url": url, "error": str(e)})
+            results.append({"title": title, "url": url, "status": "error", "error": str(e)})
+
+    return {
+        "mode": "separate",
+        "collection_id": collection_id,
+        "doc_id": doc_id,
+        "total": total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "results": results,
+    }
+
+
+# ══════════════════════════════════════════════════════════════
+# 文档章节列表（侧边栏用）
+# ══════════════════════════════════════════════════════════════
+
+def get_document_chapters(doc_id: str, user_id: int) -> list[dict]:
+    """获取文档的章节列表，用于侧边栏展示"""
+    conn = get_conn_sync()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            "SELECT id FROM documents WHERE id = %s::uuid AND user_id = %s",
+            (doc_id, user_id),
+        )
+        if not cur.fetchone():
+            return {"error": "文档不存在或无权限", "chapters": []}
+
+        cur.execute("""
+            SELECT sec_index, title, source_url, html_content_key, status, char_count
+            FROM sections
+            WHERE document_id = %s::uuid
+            ORDER BY sec_index
+        """, (doc_id,))
+        rows = cur.fetchall()
+
+        chapters = []
+        for row in rows:
+            has_content = bool(row["html_content_key"]) or row.get("status") == "done"
+            chapters.append({
+                "sec_index": row["sec_index"],
+                "title": row.get("title") or f"章节 {row['sec_index'] + 1}",
+                "source_url": row.get("source_url") or "",
+                "has_content": has_content,
+                "status": row.get("status", "pending"),
+                "char_count": row.get("char_count", 0),
+            })
+
+        return {"chapters": chapters}
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ══════════════════════════════════════════════════════════════
 # 读取段落
 # ══════════════════════════════════════════════════════════════
 
@@ -583,7 +947,7 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
         cur.execute("""
             SELECT id, sec_index, paragraph_index, title,
                    html_content_key, translated_html_key,
-                   skip_translate, status, char_count
+                   skip_translate, status, char_count, source_url
             FROM sections
             WHERE document_id = %s::uuid
             ORDER BY sec_index, paragraph_index
@@ -601,15 +965,18 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
                 sections_map[sec_i] = {
                     "sec_index": sec_i,
                     "title": row["title"],
+                    "source_url": row.get("source_url") or "",
+                    "chapter_mode": bool(row.get("source_url")),
                     "paragraphs": [],
                 }
+            # 如果 source_url 非空，这是整章 HTML（段落级 != 0 的段落有数据）
 
             # 从 MinIO 读取原文 HTML（失败则回退到 DB）
             orig_key = row["html_content_key"] or ""
             orig_html = row.get("html_content") or ""
             if orig_key and not orig_html:
                 try:
-                    data = minio_get(f"{READER_BUCKET}/{orig_key}")
+                    data = minio_get(f"{MINIO_BUCKET}/reader/{orig_key}")
                     if data:
                         orig_html = data[0].decode("utf-8", errors="replace")
                 except Exception:
@@ -620,7 +987,7 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
             trans_html = row.get("translated_html") or ""
             if trans_key and not trans_html:
                 try:
-                    data = minio_get(f"{READER_BUCKET}/{trans_key}")
+                    data = minio_get(f"{MINIO_BUCKET}/reader/{trans_key}")
                     if data:
                         trans_html = data[0].decode("utf-8", errors="replace")
                 except Exception:
@@ -772,7 +1139,7 @@ async def translate_document(
                 continue
         else:
             try:
-                data = minio_get(f"{READER_BUCKET}/{html_key}")
+                data = minio_get(f"{MINIO_BUCKET}/reader/{html_key}")
                 orig_html = data[0].decode("utf-8", errors="replace") if data else (row.get("html_content") or "")
             except Exception:
                 orig_html = row.get("html_content") or ""
@@ -790,7 +1157,7 @@ async def translate_document(
             # 写入 MinIO
             trans_key = _para_trans_key(doc_id, row["sec_index"], row["paragraph_index"])
             minio_put(
-                f"{READER_BUCKET}/{trans_key}",
+                f"{MINIO_BUCKET}/reader/{trans_key}",
                 trans_html.encode("utf-8"),
                 "text/html; charset=utf-8",
             )
