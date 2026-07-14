@@ -662,8 +662,32 @@ async def translate_paragraph(
     base_url: str,
     model: str,
     lang: str = "中文",
+    engine: str = "tencent",
+    tencent_id: str = "",
+    tencent_key: str = "",
 ) -> str:
-    """翻译单个段落。返回翻译后的 HTML（保留标签）"""
+    """翻译单个段落。返回翻译后的 HTML（保留标签）
+
+    引擎选择：
+      - "tencent"（默认）→ 腾讯翻译 API，失败时 LLM 兜底
+      - "llm"          → 直接走大模型翻译（HTML 感知）
+    """
+    # Tencent 引擎：剥离 HTML 翻译纯文本
+    if engine == "tencent" and tencent_id and tencent_key and text_content:
+        from tools.tencent_translate import translate_text as tmt_translate
+        import re
+
+        # 剥离 HTML 标签，取纯文本
+        plain = re.sub(r"<[^>]+>", "", text_content).strip()
+        if plain:
+            target_lang = "zh" if "中文" in lang else lang
+            result = await tmt_translate(plain, tencent_id, tencent_key, target=target_lang)
+            if result is not None:
+                # 用 <p> 包裹（保留段落结构）
+                paras = result.split("\n")
+                return "".join(f"<p>{p}</p>" for p in paras if p.strip())
+
+    # LLM 引擎（默认或兜底）— HTML 感知翻译
     from core.llm import chat_async
     from core.config import ModelConfig
 
