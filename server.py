@@ -959,6 +959,21 @@ async def reader_merge(doc_id: str, request: Request):
         return JSONResponse({"error": f"合并失败: {e}"}, status_code=500)
 
 
+@app.get("/api/reader/images/{doc_id}/{filename}")
+async def reader_image(doc_id: str, filename: str):
+    """从 MinIO 获取读者图片"""
+    from core.storage import minio_get
+    minio_path = f"reader/images/{doc_id}/{filename}"
+    try:
+        result = minio_get(minio_path)
+        if result is None:
+            return Response(status_code=404)
+        data, content_type = result
+        return Response(content=data, media_type=content_type)
+    except Exception:
+        return Response(status_code=404)
+
+
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8080
     uvicorn.run(app, host="0.0.0.0", port=port)
