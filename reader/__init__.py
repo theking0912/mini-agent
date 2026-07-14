@@ -13,6 +13,7 @@ from .reader_service import (
     get_sections_with_content,
     translate_paragraph,
     get_translation_progress,
+    merge_to_document,
 )
 
 __all__ = [
