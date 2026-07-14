@@ -248,8 +248,31 @@ async def translate_section(
     base_url: str,
     model: str,
     lang: str = "中文",
+    engine: str = "tencent",
+    tencent_id: str = "",
+    tencent_key: str = "",
 ) -> str:
-    """翻译单个章节内容"""
+    """翻译单个章节内容
+
+    引擎选择：
+      - "tencent"（默认）→ 腾讯翻译 API，失败时自动 LLM 兜底
+      - "llm"          → 直接走大模型翻译
+    """
+    content = section.get("content", "")
+    if not content:
+        return ""
+
+    # 腾讯引擎
+    if engine == "tencent" and tencent_id and tencent_key:
+        from tools.tencent_translate import translate_text as tmt_translate
+
+        target_lang = "zh" if "中文" in lang else lang
+        result = await tmt_translate(content, tencent_id, tencent_key, target=target_lang)
+        if result is not None:
+            return result
+        # 腾讯翻译失败 → 自动 LLM 兜底
+
+    # LLM 引擎（默认或兜底）
     from core.llm import chat_async
 
     system_prompt = f"""你是一个专业的内容翻译助手。请将以下内容翻译成{lang}。
@@ -274,7 +297,7 @@ async def translate_section(
         {"role": "system", "content": system_prompt},
         {
             "role": "user",
-            "content": f"请翻译以下内容（章节标题：{section['title']}）：\n\n{section['content']}",
+            "content": f"请翻译以下内容（章节标题：{section['title']}）：\n\n{content}",
         },
     ]
 
