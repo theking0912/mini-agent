@@ -2,7 +2,11 @@
 Reader: 服务层 — 书架/文档 CRUD + 翻译管线 + MinIO 持久化
 =========================================================
 """
+import asyncio
+import hashlib
+import httpx
 import json
+import re
 import uuid as uuid_mod
 from datetime import UTC, datetime
 from typing import Any
@@ -229,7 +233,88 @@ def delete_document(doc_id: str, user_id: int) -> bool:
 
 
 # ══════════════════════════════════════════════════════════════
-# 分析 + 存储
+# 图片 -> MinIO
+# ══════════════════════════════════════════════════════════════
+
+_IMAGE_EXT = re.compile(r"\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?|$)", re.I)
+
+def _image_filename(url: str, idx: int) -> str:
+    """生成唯一图片文件名: MD5(URL) 保留后缀"""
+    ext = "jpg"
+    m = _IMAGE_EXT.search(url)
+    if m:
+        ext = m.group(1).lower()
+    h = hashlib.md5(url.encode()).hexdigest()[:12]
+    return f"{h}.{ext}"
+
+async def _download_and_store_images(sections: list[dict], doc_id: str):
+    """扫描段落 HTML 中的所有图片，下载到 MinIO，替换 src 为本地路径"""
+    img_map = {}
+    img_urls = []
+    for sec in sections:
+        for para in sec.get("paragraphs", []):
+            for key in ("html", "orig_html", "trans_html"):
+                html = para.get(key, "")
+                if not html:
+                    continue
+                for match in re.finditer(r'<img[^>]+src=(["\'])(.+?)\1', html):
+                    url = match.group(2)
+                    if url not in img_map and not url.startswith("data:"):
+                        img_map[url] = ""
+                        img_urls.append(url)
+
+    if not img_urls:
+        return
+
+    sem = asyncio.Semaphore(5)
+    async def fetch_one(url: str) -> tuple[str, bytes | None]:
+        async with sem:
+            try:
+                async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
+                    resp = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                    if resp.status_code == 200 and resp.content:
+                        return url, resp.content
+            except Exception:
+                pass
+            return url, None
+
+    tasks = [fetch_one(url) for url in img_urls]
+    results = await asyncio.gather(*tasks)
+
+    for url, data in results:
+        if data is None:
+            continue
+        idx = img_urls.index(url)
+        filename = _image_filename(url, idx)
+        minio_path = f"reader/images/{doc_id}/{filename}"
+        try:
+            ext = filename.rsplit(".", 1)[-1].lower()
+            ct_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                      "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
+                      "bmp": "image/bmp", "ico": "image/x-icon"}
+            ct = ct_map.get(ext, "image/jpeg")
+            ok = minio_put(minio_path, data, ct)
+            if ok:
+                img_map[url] = f"/api/reader/images/{doc_id}/{filename}"
+        except Exception:
+            pass
+
+    for sec in sections:
+        for para in sec.get("paragraphs", []):
+            for key in ("html", "orig_html", "trans_html"):
+                html = para.get(key, "")
+                if not html:
+                    continue
+                for orig_url, local_path in img_map.items():
+                    if not local_path:
+                        continue
+                    html = html.replace(f'src="{orig_url}"', f'src="{local_path}"')
+                    html = html.replace(f"src='{orig_url}'", f"src='{local_path}'")
+                para[key] = html
+
+
+# ══════════════════════════════════════════════════════════════
+# 导入分析
 # ══════════════════════════════════════════════════════════════
 
 async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -> dict:
@@ -261,6 +346,9 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
             RETURNING *
         """, (doc_id, collection_id, user_id, page_title, url))
         doc = _dict_row(cur, cur.fetchone())
+
+        # 下载所有图片到 MinIO，替换 HTML 中的 src
+        await _download_and_store_images(sections, doc_id)
 
         # 2. 逐章节逐段落写入
         for sec_idx, sec in enumerate(sections):
@@ -374,6 +462,9 @@ async def merge_to_document(doc_id: str, user_id: int, url: str) -> dict:
         added_chars = 0
         added_paragraphs = 0
         added_sections = 0
+
+        # 下载新章节的图片到 MinIO
+        await _download_and_store_images(new_sections, doc_id)
 
         # 5. 写入新章节/段落
         for sec_idx_offset, sec in enumerate(new_sections):
