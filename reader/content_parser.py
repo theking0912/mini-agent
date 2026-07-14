@@ -311,6 +311,9 @@ async def analyze_url(url: str) -> dict:
     # 拆分为章节和段落
     sections = _split_document(main_el)
 
+    # 将相对路径的 img src 和 a href 转为绝对 URL
+    _resolve_urls(sections, url)
+
     total_chars = 0
     total_paragraphs = 0
     for sec in sections:
@@ -325,3 +328,33 @@ async def analyze_url(url: str) -> dict:
         "total_chars": total_chars,
         "total_paragraphs": total_paragraphs,
     }
+
+
+def _resolve_urls(sections: list[dict], base_url: str):
+    """将段落 HTML 中的相对路径 img src 和 a href 转为绝对 URL"""
+    from urllib.parse import urljoin, urlparse
+
+    def _resolve_in_html(html: str, attr: str) -> str:
+        """替换 HTML 中所有 tag 的 attr 属性值为绝对 URL"""
+        # Match: src="..." or src='...' or href="..." or href='...'
+        pattern = rf'({attr}=["\'])([^"\']+)(["\'])'
+        def replacer(m):
+            prefix = m.group(1)
+            val = m.group(2)
+            suffix = m.group(3)
+            # Skip if already absolute (has scheme or starts with //)
+            if val.startswith(('http://', 'https://', '//', 'data:', 'mailto:', 'tel:', '#', 'javascript:')):
+                return m.group(0)
+            abs_url = urljoin(base_url, val)
+            return f'{prefix}{abs_url}{suffix}'
+        return re.sub(pattern, replacer, html)
+
+    for sec in sections:
+        for para in sec.get("paragraphs", []):
+            html = para.get("html", "")
+            if html:
+                html = _resolve_in_html(html, 'src')
+                html = _resolve_in_html(html, 'href')
+                para["html"] = html
+                # Also update text representation if needed
+                para["char_count"] = len(para.get("text", ""))
