@@ -1115,8 +1115,8 @@ async def reader_merge(doc_id: str, request: Request):
 @app.get("/api/reader/images/{doc_id}/{filename}")
 async def reader_image(doc_id: str, filename: str):
     """从 MinIO 获取读者图片"""
-    from core.storage import minio_get
-    minio_path = f"reader/images/{doc_id}/{filename}"
+    from core.storage import minio_get, MINIO_BUCKET
+    minio_path = f"{MINIO_BUCKET}/reader/images/{doc_id}/{filename}"
     try:
         result = minio_get(minio_path)
         if result is None:

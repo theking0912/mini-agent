@@ -200,7 +200,7 @@ def get_document(doc_id: str, user_id: int) -> dict | None:
 
 
 def delete_document(doc_id: str, user_id: int) -> bool:
-    """删除文档（级联删除段落）"""
+    """删除文档（级联删除段落 + MinIO 内容）"""
     conn = get_conn_sync()
     conn.autocommit = True
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -212,6 +212,13 @@ def delete_document(doc_id: str, user_id: int) -> bool:
         )
         keys = [(r["html_content_key"], r["translated_html_key"]) for r in cur.fetchall() if r]
 
+        # 获取文档图片路径
+        cur.execute(
+            "SELECT image_path FROM reader_images WHERE document_id = %s::uuid",
+            (doc_id,),
+        )
+        img_paths = [r["image_path"] for r in cur.fetchall() if r.get("image_path")]
+
         # 删除文档（级联删除段落）
         cur.execute(
             "DELETE FROM documents WHERE id = %s::uuid AND user_id = %s",
@@ -221,15 +228,29 @@ def delete_document(doc_id: str, user_id: int) -> bool:
 
         # 清理 MinIO 中的内容（忽略失败）
         if deleted:
+            from core.storage import minio_delete
+            # 清理段落/章节 HTML
             for orig_key, trans_key in keys:
                 try:
-                    from core.storage import minio_delete
                     if orig_key:
                         minio_delete(f"{MINIO_BUCKET}/reader/{orig_key}")
                     if trans_key:
                         minio_delete(f"{MINIO_BUCKET}/reader/{trans_key}")
                 except Exception:
                     pass
+
+            # 清理图片
+            for img_path in img_paths:
+                try:
+                    minio_delete(img_path)
+                except Exception:
+                    pass
+
+            # 清理图片记录
+            try:
+                cur.execute("DELETE FROM reader_images WHERE document_id = %s::uuid", (doc_id,))
+            except Exception:
+                pass
 
         return deleted
     finally:
@@ -291,7 +312,7 @@ async def _download_and_store_images(sections: list[dict], doc_id: str):
             continue
         idx = img_urls.index(url)
         filename = _image_filename(url, idx)
-        minio_path = f"reader/images/{doc_id}/{filename}"
+        minio_path = f"{MINIO_BUCKET}/reader/images/{doc_id}/{filename}"
         try:
             ext = filename.rsplit(".", 1)[-1].lower()
             ct_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
@@ -301,6 +322,20 @@ async def _download_and_store_images(sections: list[dict], doc_id: str):
             ok = minio_put(minio_path, data, ct)
             if ok:
                 img_map[url] = f"/api/reader/images/{doc_id}/{filename}"
+                # 记录图片路径到 DB，用于删除时清理
+                try:
+                    from core.db import get_conn_sync as _get_img_conn
+                    _ic = _get_img_conn()
+                    _icur = _ic.cursor()
+                    _icur.execute(
+                        "INSERT INTO reader_images (document_id, image_path) VALUES (%s::uuid, %s) ON CONFLICT DO NOTHING",
+                        (doc_id, minio_path)
+                    )
+                    _ic.commit()
+                    _icur.close()
+                    _ic.close()
+                except Exception:
+                    pass
         except Exception:
             pass
 
