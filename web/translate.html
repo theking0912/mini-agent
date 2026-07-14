@@ -514,6 +514,11 @@ header .nav .user { color: var(--text3); font-size: 11px; }
           <button class="btn" data-view="sbs" onclick="switchView('sbs')">📑 左右</button>
         </div>
         <button class="btn btn-primary btn-sm" id="translateBtn" onclick="startTranslate()" style="display:none">🌐 翻译</button>
+        <select id="engineSelect" style="display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 6px;font-size:11px;outline:none" onchange="onEngineChange()">
+          <option value="tencent">⚡ 腾讯翻译</option>
+          <option value="llm">🤖 大模型</option>
+        </select>
+        <button class="btn btn-outline btn-sm" id="tencentConfigBtn" onclick="showTencentConfig()" style="display:none" title="配置腾讯翻译密钥">🔑</button>
         <button class="btn btn-outline btn-sm" id="deleteDocBtn" onclick="deleteDocument()" style="display:none">🗑</button>
         <button class="btn btn-outline btn-sm" id="mergeBtn" onclick="toggleMergeInput()" style="display:none">➕ 章节</button>
       </div>
@@ -544,6 +549,22 @@ header .nav .user { color: var(--text3); font-size: 11px; }
     <div class="btn-row">
       <button class="btn btn-outline btn-sm" onclick="closeNewCol()">取消</button>
       <button class="btn btn-primary btn-sm" onclick="confirmNewCol()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tencent Config Dialog -->
+<div class="dialog-overlay" id="tencentDialog">
+  <div class="dialog">
+    <h3>🔑 腾讯翻译密钥配置</h3>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:10px">从 <a href="https://console.cloud.tencent.com/cam/capi" target="_blank" style="color:var(--primary)">腾讯云控制台 → 访问管理 → API密钥</a> 获取</p>
+    <input type="text" id="tencentSecretId" placeholder="SecretId" onkeydown="if(event.key==='Enter') saveTencentConfig()">
+    <input type="password" id="tencentSecretKey" placeholder="SecretKey" onkeydown="if(event.key==='Enter') saveTencentConfig()">
+    <div id="tencentMsg" class="msg"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline btn-sm" onclick="closeTencentConfig()">取消</button>
+      <button class="btn btn-outline btn-sm" onclick="deleteTencentConfig()">清除</button>
+      <button class="btn btn-primary btn-sm" onclick="saveTencentConfig()">保存</button>
     </div>
   </div>
 </div>
@@ -755,6 +776,8 @@ async function selectDocument(docId) {
 
   document.getElementById('translateBtn').style.display = 'none';
   document.getElementById('deleteDocBtn').style.display = 'none';
+  document.getElementById('engineSelect').style.display = 'none';
+  document.getElementById('tencentConfigBtn').style.display = 'none';
   hideProgress();
 
   try {
@@ -772,6 +795,8 @@ async function selectDocument(docId) {
     document.getElementById('translateBtn').style.display = hasUntranslated ? '' : 'none';
     document.getElementById('deleteDocBtn').style.display = '';
     document.getElementById('mergeBtn').style.display = '';
+    document.getElementById('engineSelect').style.display = '';
+    document.getElementById('tencentConfigBtn').style.display = '';
 
     renderReader();
   } catch (e) {
@@ -1009,11 +1034,13 @@ async function startTranslate() {
 
   showProgress(0);
 
+  const engine = document.getElementById('engineSelect').value;
+
   try {
     const res = await fetch('/api/reader/translate/' + encodeURIComponent(currentDocId), {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN},
-      body: JSON.stringify({lang: '中文'}),
+      body: JSON.stringify({lang: '中文', engine: engine}),
     });
 
     if (!res.ok) {
@@ -1274,6 +1301,85 @@ async function mergeChapter() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Tencent Translation / Engine
+// ══════════════════════════════════════════════════════════════
+
+function onEngineChange() {
+  const engine = document.getElementById('engineSelect').value;
+  localStorage.setItem('translate_engine', engine);
+}
+
+function loadEnginePref() {
+  const saved = localStorage.getItem('translate_engine');
+  if (saved) {
+    document.getElementById('engineSelect').value = saved;
+  }
+}
+
+function showTencentConfig() {
+  document.getElementById('tencentDialog').classList.add('show');
+  document.getElementById('tencentMsg').className = 'msg';
+  // Load existing keys
+  loadTencentStatus();
+}
+
+function closeTencentConfig() {
+  document.getElementById('tencentDialog').classList.remove('show');
+}
+
+async function loadTencentStatus() {
+  try {
+    const data = await fetchApi('/api/key/tencent');
+    if (data.has_id) {
+      document.getElementById('tencentSecretId').placeholder = 'SecretId ✓ 已配置';
+    }
+    if (data.has_key) {
+      document.getElementById('tencentSecretKey').placeholder = 'SecretKey ✓ 已配置';
+    }
+  } catch (e) {}
+}
+
+async function saveTencentConfig() {
+  const secretId = document.getElementById('tencentSecretId').value.trim();
+  const secretKey = document.getElementById('tencentSecretKey').value.trim();
+  if (!secretId || !secretKey) {
+    document.getElementById('tencentMsg').textContent = 'SecretId 和 SecretKey 不能为空';
+    document.getElementById('tencentMsg').className = 'msg show error';
+    return;
+  }
+  try {
+    const data = await fetchApi('/api/key/tencent', {
+      method: 'POST',
+      body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
+    });
+    if (data.message) {
+      document.getElementById('tencentMsg').textContent = data.message;
+      document.getElementById('tencentMsg').className = 'msg show success';
+      document.getElementById('tencentSecretId').value = '';
+      document.getElementById('tencentSecretKey').value = '';
+      document.getElementById('tencentSecretId').placeholder = 'SecretId ✓ 已配置';
+      document.getElementById('tencentSecretKey').placeholder = 'SecretKey ✓ 已配置';
+    }
+  } catch (e) {
+    document.getElementById('tencentMsg').textContent = '保存失败: ' + e.message;
+    document.getElementById('tencentMsg').className = 'msg show error';
+  }
+}
+
+async function deleteTencentConfig() {
+  try {
+    const data = await fetchApi('/api/key/tencent', { method: 'DELETE' });
+    document.getElementById('tencentMsg').textContent = data.message;
+    document.getElementById('tencentMsg').className = 'msg show info';
+    document.getElementById('tencentSecretId').placeholder = 'SecretId';
+    document.getElementById('tencentSecretKey').placeholder = 'SecretKey';
+  } catch (e) {
+    document.getElementById('tencentMsg').textContent = '清除失败: ' + e.message;
+    document.getElementById('tencentMsg').className = 'msg show error';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // Init
 // ══════════════════════════════════════════════════════════════
 
@@ -1291,6 +1397,7 @@ if (localStorage.getItem('reader_sidebar_collapsed') === '1') {
 }
 
 loadCollections();
+loadEnginePref();
 </script>
 </body>
 </html>
