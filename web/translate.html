@@ -550,8 +550,8 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .chapter-item:last-child { border-bottom: none; }
 .chapter-item:hover { background: var(--surface2); }
 .chapter-item input[type="checkbox"] { flex-shrink: 0; }
-.chapter-item .ch-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chapter-item .ch-url { color: var(--text3); font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-item .ch-title { font-weight:600; font-size:13px; white-space:normal; word-break:break-word; overflow:visible; }
+.chapter-item .ch-url { color: var(--text3); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chapter-count { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
 .import-mode {
   display: flex;
@@ -893,8 +893,10 @@ function showChaptersDialog(chapters, docId) {
     item.className = 'chapter-item';
     item.innerHTML = `
       <input type="checkbox" checked data-idx="${i}">
-      <span class="ch-title">${escapeHtml(title)}</span>
-      <span class="ch-url">${escapeHtml(url)}</span>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+        <span class="ch-title" style="font-weight:600;font-size:13px;white-space:normal;word-break:break-word;overflow:visible">${escapeHtml(title)}</span>
+        <span class="ch-url">${escapeHtml(url)}</span>
+      </div>
     `;
     item.style.display = 'flex';
     // Toggle checkbox on click (but not on the checkbox itself)
