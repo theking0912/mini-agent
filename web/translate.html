@@ -34,7 +34,6 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
-/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -65,28 +64,17 @@ header .nav a:hover { color: var(--primary); }
 header .nav .user { color: var(--text3); font-size: 11px; }
 
 /* ── Body layout ── */
-.body-layout {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
+.body-layout { display: flex; flex: 1; overflow: hidden; }
 
 /* ── Left: Bookshelf ── */
 .sidebar {
-  width: 280px;
-  min-width: 280px;
+  width: 280px; min-width: 280px;
   background: var(--surface);
   border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: flex; flex-direction: column; overflow: hidden;
   transition: width .2s, min-width .2s;
 }
-.sidebar.collapsed {
-  width: 0;
-  min-width: 0;
-  border-right: none;
-}
+.sidebar.collapsed { width: 0; min-width: 0; border-right: none; }
 .sidebar.collapsed > * { display: none; }
 .sidebar-top {
   padding: 10px;
@@ -121,61 +109,38 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 
 /* ── Translate Progress Button ── */
 .translate-progress {
-  position: relative;
-  overflow: hidden;
-  padding: 5px 10px;
-  border: none;
+  position: relative; overflow: hidden;
+  padding: 5px 10px; border: none;
   border-radius: var(--radius-sm);
-  font-size: 11px;
-  cursor: pointer;
-  font-weight: 500;
-  background: var(--primary);
+  font-size: 11px; cursor: pointer;
+  font-weight: 500; background: var(--primary);
   color: white;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 70px;
-  height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 70px; height: 26px;
 }
 .translate-progress .tpf {
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  background: rgba(255,255,255,.18);
-  width: 0%;
-  transition: width .25s ease;
-  pointer-events: none;
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: rgba(255,255,255,.18); width: 0%;
+  transition: width .25s ease; pointer-events: none;
 }
-.translate-progress span {
-  position: relative;
-  z-index: 1;
-  white-space: nowrap;
-}
+.translate-progress span { position: relative; z-index: 1; white-space: nowrap; }
 .btn-outline {
-  background: transparent;
-  color: var(--text);
+  background: transparent; color: var(--text);
   border: 1px solid var(--border);
 }
 .btn-outline:hover { background: var(--surface2); }
+.btn-outline.active { background: var(--primary); color: white; border-color: var(--primary); }
+.btn-outline.active:hover { background: var(--primary-dim); }
 .btn-sm { padding: 5px 8px; font-size: 11px; }
 .btn-xs { padding: 3px 6px; font-size: 10px; }
 
 /* ── Collection list ── */
-.collection-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
-}
+.collection-list { flex: 1; overflow-y: auto; padding: 4px 0; }
 .collection-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  cursor: pointer;
-  transition: background .1s;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  user-select: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; cursor: pointer;
+  transition: background .1s; font-size: 13px; font-weight: 600;
+  color: var(--text); user-select: none;
 }
 .collection-header:hover { background: var(--surface2); }
 .collection-header .arrow { color: var(--text3); font-size: 10px; width: 14px; }
@@ -185,17 +150,12 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .collection-header .actions { display: none; gap: 4px; }
 .collection-header:hover .actions { display: flex; }
 
-/* ── Document items ── */
 .doc-items { display: none; }
 .doc-items.open { display: block; }
 .doc-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px 6px 32px;
-  cursor: pointer;
-  transition: background .1s;
-  font-size: 12px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px 6px 32px; cursor: pointer;
+  transition: background .1s; font-size: 12px;
   border-left: 3px solid transparent;
 }
 .doc-item:hover { background: var(--surface2); }
@@ -212,108 +172,54 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 
 /* ── Empty sidebar ── */
 .sidebar-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text3);
-  gap: 4px;
-  font-size: 12px;
-  padding: 20px;
-  text-align: center;
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text3); gap: 4px; font-size: 12px;
+  padding: 20px; text-align: center;
 }
 
 /* ── Main area ── */
-.main-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+.main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .main-header {
   padding: 10px 20px;
   border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-  min-height: 42px;
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; min-height: 42px;
 }
 .main-header .doc-title {
-  font-size: 14px;
-  font-weight: 600;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .main-header .actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .main-header .actions .btn { padding: 5px 10px; border: none; border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; font-weight: 500; }
-.main-header .view-toggle { display: flex; gap: 2px; }
-.main-header .view-toggle .btn {
-  background: transparent;
-  color: var(--text3);
-  border: 1px solid var(--border);
-  padding: 4px 8px;
-  font-size: 11px;
-}
-.main-header .view-toggle .btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-.main-header .view-toggle .btn:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.main-header .view-toggle .btn:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 
-/* ── Reader content ── */
-.reader-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px 48px;
-}
-.reader-content.loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.reader-content { flex: 1; overflow-y: auto; padding: 24px 48px; }
+.reader-content.loading { display: flex; align-items: center; justify-content: center; }
 
 /* ── Empty state ── */
 .empty-state {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text3);
-  gap: 6px;
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text3); gap: 6px;
 }
 .empty-state .icon { font-size: 48px; opacity: .4; }
 .empty-state p { font-size: 13px; }
 
 /* ── Loading ── */
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text2);
-  font-size: 12px;
-}
+.loading-indicator { display: flex; align-items: center; gap: 8px; color: var(--text2); font-size: 12px; }
 .spinner {
   width: 14px; height: 14px;
   border: 2px solid var(--border);
   border-top: 2px solid var(--primary);
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
+  border-radius: 50%; animation: spin .8s linear infinite;
   flex-shrink: 0;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Message ── */
+/* ── Sidebar msg ── */
 .msg {
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  display: none;
-  line-height: 1.5;
-  margin: 6px 10px;
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  font-size: 11px; display: none; line-height: 1.5; margin: 6px 10px;
 }
 .msg.show { display: block; }
 .msg.error { background: rgba(225,112,85,.15); border: 1px solid var(--error); color: var(--error); }
@@ -321,67 +227,37 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .msg.info { background: rgba(108,92,231,.15); border: 1px solid var(--primary); color: var(--primary); }
 .msg.warn { background: rgba(253,203,110,.15); border: 1px solid var(--warn); color: var(--warn); }
 
-/* ── Progress bar ── */
 .progress-bar {
-  height: 3px;
-  background: var(--surface2);
-  border-radius: 2px;
-  overflow: hidden;
-  flex-shrink: 0;
-  display: none;
-  margin: 0 10px 4px;
+  height: 3px; background: var(--surface2);
+  border-radius: 2px; overflow: hidden; flex-shrink: 0;
+  display: none; margin: 0 10px 4px;
 }
 .progress-bar.show { display: block; }
-.progress-bar .fill {
-  height: 100%;
-  background: var(--primary);
-  width: 0%;
-  transition: width .3s ease;
-}
+.progress-bar .fill { height: 100%; background: var(--primary); width: 0%; transition: width .3s ease; }
 
 /* ── Section heading ── */
 .section-heading {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--primary);
-  margin: 28px 0 16px;
-  padding-bottom: 8px;
+  font-size: 18px; font-weight: 700; color: var(--primary);
+  margin: 28px 0 16px; padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 .section-heading:first-child { margin-top: 0; }
 
-/* ── Paragraph block (interleaved view) ── */
-.para-block {
-  margin-bottom: 4px;
-  transition: opacity .15s;
-}
+/* ── Paragraph block ── */
+.para-block { margin-bottom: 4px; transition: opacity .15s; }
 .para-block.code-block { margin-bottom: 12px; }
 
-/* ── Original text ── */
 .para-orig {
-  font-size: 14px;
-  line-height: 1.75;
-  color: var(--text);
-  padding: 4px 0;
-  position: relative;
+  font-size: 14px; line-height: 1.75; color: var(--text);
+  padding: 4px 0; position: relative;
 }
 .para-orig .para-index {
-  position: absolute;
-  left: -28px;
-  top: 6px;
-  font-size: 9px;
-  color: var(--text3);
-  font-family: var(--mono);
-  opacity: .5;
+  position: absolute; left: -28px; top: 6px;
+  font-size: 9px; color: var(--text3); font-family: var(--mono); opacity: .5;
 }
-
-/* ── Translated text ── */
 .para-trans {
-  font-size: 14px;
-  line-height: 1.75;
-  color: var(--success);
-  padding: 4px 12px;
-  margin-bottom: 8px;
+  font-size: 14px; line-height: 1.75; color: var(--success);
+  padding: 4px 12px; margin-bottom: 8px;
   border-left: 2px solid var(--success);
   background: rgba(0,184,148,.04);
   border-radius: 0 4px 4px 0;
@@ -389,18 +265,10 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 
 /* ── Side-by-side view ── */
 .sbs-container { display: flex; gap: 20px; }
-.sbs-pane {
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-}
+.sbs-pane { flex: 1; min-width: 0; overflow-x: auto; }
 .sbs-pane .pane-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text3);
-  margin-bottom: 8px;
-  padding-bottom: 4px;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text3); margin-bottom: 8px; padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
 .sbs-pane.orig-pane .pane-label { color: var(--text); }
@@ -410,65 +278,36 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .para-block p, .para-orig p, .para-trans p { margin-bottom: 6px; }
 .para-block h1,.para-block h2,.para-block h3,.para-block h4,
 .para-orig h1,.para-orig h2,.para-orig h3,.para-orig h4,
-.para-trans h1,.para-trans h2,.para-trans h3,.para-trans h4 {
-  color: var(--primary);
-  margin: 12px 0 6px;
-}
+.para-trans h1,.para-trans h2,.para-trans h3,.para-trans h4 { color: var(--primary); margin: 12px 0 6px; }
 .para-orig h1,.para-orig h2,.para-orig h3,.para-orig h4 { color: var(--text); font-weight: 700; }
 .para-block pre, .para-orig pre, .para-trans pre {
-  background: var(--surface2);
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  overflow-x: auto;
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.5;
-  margin: 8px 0;
+  background: var(--surface2); padding: 12px 16px;
+  border-radius: var(--radius-sm); overflow-x: auto;
+  font-family: var(--mono); font-size: 13px; line-height: 1.5; margin: 8px 0;
 }
 .para-block code, .para-orig code, .para-trans code {
-  background: var(--surface2);
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-family: var(--mono);
-  font-size: 13px;
+  background: var(--surface2); padding: 1px 4px; border-radius: 3px;
+  font-family: var(--mono); font-size: 13px;
 }
 .para-block pre code, .para-orig pre code, .para-trans pre code { background: none; padding: 0; }
-.para-block ul,.para-block ol,.para-orig ul,.para-orig ol,.para-trans ul,.para-trans ol {
-  padding-left: 20px;
-  margin: 6px 0;
-}
+.para-block ul,.para-block ol,.para-orig ul,.para-orig ol,.para-trans ul,.para-trans ol { padding-left: 20px; margin: 6px 0; }
 .para-block li,.para-orig li,.para-trans li { margin: 2px 0; }
-.para-block table,.para-orig table,.para-trans table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 8px 0;
-}
+.para-block table,.para-orig table,.para-trans table { border-collapse: collapse; width: 100%; margin: 8px 0; }
 .para-block td,.para-block th,.para-orig td,.para-orig th,.para-trans td,.para-trans th {
-  border: 1px solid var(--border);
-  padding: 6px 10px;
-  font-size: 13px;
+  border: 1px solid var(--border); padding: 6px 10px; font-size: 13px;
 }
 .para-block th,.para-orig th,.para-trans th { background: var(--surface2); }
 .para-block blockquote,.para-orig blockquote,.para-trans blockquote {
-  border-left: 3px solid var(--primary);
-  padding: 6px 12px;
-  margin: 8px 0;
-  color: var(--text2);
-  background: rgba(108,92,231,.06);
+  border-left: 3px solid var(--primary); padding: 6px 12px; margin: 8px 0;
+  color: var(--text2); background: rgba(108,92,231,.06);
   border-radius: 0 4px 4px 0;
 }
 .para-block a,.para-orig a,.para-trans a { color: var(--primary); text-decoration: underline; }
 .para-block img,.para-orig img,.para-trans img { max-width: 100%; border-radius: var(--radius-sm); }
 
-/* ── Flowing content (paragraphs merged) ── */
-.flowing-content {
-  line-height: 1.8;
-  font-size: 14px;
-  padding: 0 4px;
-  margin-bottom: 20px;
-}
-.flowing-content h1, .flowing-content h2, .flowing-content h3,
-.flowing-content h4 { color: var(--primary); margin: 16px 0 8px; }
+/* ── Flowing content ── */
+.flowing-content { line-height: 1.8; font-size: 14px; padding: 0 4px; margin-bottom: 20px; }
+.flowing-content h1, .flowing-content h2, .flowing-content h3, .flowing-content h4 { color: var(--primary); margin: 16px 0 8px; }
 .flowing-content p { margin: 8px 0; }
 .flowing-content pre { background: var(--surface2); padding: 12px 16px; border-radius: var(--radius-sm); overflow-x: auto; margin: 8px 0; }
 .flowing-content code { background: var(--surface2); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
@@ -478,14 +317,7 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .flowing-content img { max-width: 100%; border-radius: var(--radius-sm); }
 .flowing-content table { border-collapse: collapse; width: 100%; margin: 8px 0; }
 .flowing-content td, .flowing-content th { border: 1px solid var(--border); padding: 6px 10px; }
-.flowing-trans {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-  line-height: 1.8;
-  font-size: 14px;
-  color: var(--text2);
-}
+.flowing-trans { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); line-height: 1.8; font-size: 14px; color: var(--text2); }
 .flowing-trans p { margin: 8px 0; }
 
 /* ── Status badge ── */
@@ -497,24 +329,174 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 
 /* ── Dialog / modal ── */
 .dialog-overlay {
-  display: none;
-  position: fixed;
+  display: none; position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,.5);
+  background: rgba(0,0,0,.6);
+  backdrop-filter: blur(4px);
   z-index: 100;
-  align-items: center;
-  justify-content: center;
+  align-items: center; justify-content: center;
 }
 .dialog-overlay.show { display: flex; }
 .dialog {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  min-width: 300px;
-  max-width: 400px;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
 }
-.dialog h3 { font-size: 14px; margin-bottom: 12px; }
+.dialog h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.dialog .dialog-desc { font-size: 12px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+
+/* ── Chapters Dialog ── */
+.chapter-count-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.chapter-count-bar .ch-count { font-size: 12px; color: var(--text2); font-weight: 500; }
+.chapter-count-bar .ch-actions { display: flex; gap: 8px; }
+.chapter-count-bar .ch-actions button {
+  background: none; border: none; color: var(--text3);
+  font-size: 11px; cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; transition: color .1s;
+}
+.chapter-count-bar .ch-actions button:hover { color: var(--primary); }
+
+.chapter-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  max-height: 280px;
+}
+.chapter-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.chapter-item:last-child { border-bottom: none; }
+.chapter-item:hover { background: var(--surface); }
+.chapter-item input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: var(--primary);
+  width: 15px; height: 15px;
+  cursor: pointer;
+}
+.chapter-item .ch-info { flex: 1; min-width: 0; }
+.chapter-item .ch-title { font-weight: 500; font-size: 12px; white-space: normal; word-break: break-word; }
+.chapter-item .ch-url { color: var(--text3); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.chapter-item .ch-num {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: var(--text3);
+  font-weight: 500;
+}
+
+/* ── Manual URL row ── */
+.chapter-manual-row {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.chapter-manual-row input {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  outline: none;
+}
+.chapter-manual-row input:focus { border-color: var(--primary); }
+.chapter-manual-row .btn-add {
+  padding: 6px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s;
+}
+.chapter-manual-row .btn-add:hover { background: var(--surface3); }
+
+/* ── Import Mode Cards ── */
+.import-mode-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.import-mode-card {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.import-mode-card:hover { border-color: var(--text3); }
+.import-mode-card.active {
+  border-color: var(--primary);
+  background: rgba(108,92,231,.08);
+}
+.import-mode-card input { display: none; }
+.import-mode-card .imc-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.import-mode-card .imc-label { font-size: 12px; font-weight: 500; color: var(--text); }
+.import-mode-card .imc-desc { font-size: 10px; color: var(--text3); margin-top: 3px; line-height: 1.4; }
+.import-mode-card.active .imc-desc { color: var(--text2); }
+
+/* ── Chapter import progress ── */
+.chapter-import-progress { display: none; margin-bottom: 12px; }
+.chapter-import-progress.show { display: block; }
+.chip-progress-text { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+.chip-progress-bar { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.chip-progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); width: 0%; transition: width .3s ease; border-radius: 3px; }
+
+/* ── Dialog buttons ── */
+.dialog-btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-btn-row .btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+}
+.dialog-btn-row .btn-cancel {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border);
+}
+.dialog-btn-row .btn-cancel:hover { background: var(--surface2); }
+.dialog-btn-row .btn-primary {
+  background: var(--primary);
+  color: white;
+}
+.dialog-btn-row .btn-primary:hover { background: var(--primary-dim); }
+.dialog-btn-row .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.dialog-btn-row .btn-confirm {
+  background: linear-gradient(135deg, var(--primary), #8b7cf7);
+  color: white;
+}
+.dialog-btn-row .btn-confirm:hover {
+  background: linear-gradient(135deg, var(--primary-dim), var(--primary));
+}
+.dialog-btn-row .btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Old dialogs (Tencent, New Collection) ── */
 .dialog input {
   width: 100%;
   background: var(--surface2);
@@ -529,75 +511,27 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .dialog input:focus { border-color: var(--primary); }
 .dialog .btn-row { display: flex; gap: 6px; justify-content: flex-end; }
 
-/* ── Chapters dialog ── */
-.chapter-list {
-  max-height: 300px;
-  overflow-y: auto;
-  margin: 10px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.chapter-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: background .1s;
-}
-.chapter-item:last-child { border-bottom: none; }
-.chapter-item:hover { background: var(--surface2); }
-.chapter-item input[type="checkbox"] { flex-shrink: 0; }
-.chapter-item .ch-title { font-weight:600; font-size:13px; white-space:normal; word-break:break-word; overflow:visible; }
-.chapter-item .ch-url { color: var(--text3); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chapter-count { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
-.import-mode {
-  display: flex;
-  gap: 12px;
-  margin: 8px 0;
-  padding: 8px 10px;
-  background: var(--surface2);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-}
-.import-mode label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-.chapter-manual-row { display: flex; gap: 6px; margin: 8px 0; }
-.chapter-manual-row input { flex: 1; background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 8px; font-size: 11px; outline: none; }
-.chapter-manual-row input:focus { border-color: var(--primary); }
-.chapter-manual-row .btn { padding: 4px 8px; font-size: 11px; }
-.chip-progress-text { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
-
 /* ── Sidebar chapter items ── */
 .sidebar-chapter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: flex; align-items: center; gap: 6px;
   padding: 4px 10px 4px 28px;
-  font-size: 11px;
-  color: var(--text2);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
+  font-size: 11px; color: var(--text2);
+  cursor: pointer; border-radius: var(--radius-sm);
   transition: background .15s;
 }
 .sidebar-chapter:hover { background: var(--surface2); color: var(--text); }
 .sidebar-chapter.active { color: var(--primary); background: rgba(108,92,231,.08); }
 .sidebar-chapter .sch-icon { font-size: 10px; flex-shrink: 0; }
 .sidebar-chapter .sch-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sidebar-chapter .sch-loading { font-size: 10px; color: var(--text3); }
 .sidebar-chapter .sch-action { font-size: 10px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }
 .sidebar-chapter .sch-action:hover { background: var(--surface2); }
 .chapter-load-all {
   display: block;
   margin: 4px 10px 4px 28px;
-  padding: 4px 10px;
-  font-size: 10px;
-  color: var(--primary);
-  cursor: pointer;
+  padding: 4px 10px; font-size: 10px;
+  color: var(--primary); cursor: pointer;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  text-align: center;
+  border-radius: var(--radius-sm); text-align: center;
   transition: background .15s;
 }
 .chapter-load-all:hover { background: var(--surface2); }
@@ -607,11 +541,8 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 /* ── Chapter view in reader ── */
 .chapter-nav { padding: 10px 0; }
 .chapter-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -625,17 +556,14 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .chapter-nav-item .cnav-arrow { color: var(--text3); font-size: 12px; }
 .chapter-nav-item:hover .cnav-arrow { color: var(--primary); }
 .chapter-topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   padding: 8px 0 14px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
 }
 .chapter-title-label { font-size: 15px; font-weight: 700; color: var(--primary); }
 .chapter-content { line-height: 1.8; font-size: 14px; }
-.chapter-content h1, .chapter-content h2, .chapter-content h3,
-.chapter-content h4 { color: var(--primary); margin: 16px 0 8px; }
+.chapter-content h1, .chapter-content h2, .chapter-content h3, .chapter-content h4 { color: var(--primary); margin: 16px 0 8px; }
 .chapter-content p { margin: 8px 0; }
 .chapter-content pre { background: var(--surface2); padding: 12px 16px; border-radius: var(--radius-sm); overflow-x: auto; margin: 8px 0; }
 .chapter-content code { background: var(--surface2); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
@@ -646,13 +574,8 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .chapter-content table { border-collapse: collapse; width: 100%; margin: 8px 0; }
 .chapter-content td, .chapter-content th { border: 1px solid var(--border); padding: 6px 10px; }
 
-/* ── Chapter index ── */
 .chapter-index { padding: 10px 0; }
-
-.chapter-import-progress {
-  display: none;
-  margin-top: 8px;
-}
+.chapter-import-progress { display: none; margin-top: 8px; }
 .chapter-import-progress.show { display: block; }
 .chip-progress-bar { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
 .chip-progress-fill { height: 100%; background: var(--success); width: 0%; transition: width .3s ease; }
@@ -697,9 +620,9 @@ header .nav .user { color: var(--text3); font-size: 11px; }
     <div class="main-header" id="mainHeader" style="display:none">
       <span class="doc-title" id="docTitle">选择一篇文章</span>
       <div class="actions">
-        <div class="view-toggle" id="viewToggle">
-          <button class="btn active" data-view="interleaved" onclick="switchView('interleaved')">📄 交错</button>
-          <button class="btn" data-view="sbs" onclick="switchView('sbs')">📑 左右</button>
+        <div class="view-toggle" id="viewToggle" style="display:flex;gap:2px">
+          <button class="btn btn-outline btn-sm active" data-view="interleaved" onclick="switchView('interleaved')">📄 交错</button>
+          <button class="btn btn-outline btn-sm" data-view="sbs" onclick="switchView('sbs')">📑 左右</button>
         </div>
         <button class="btn btn-primary btn-sm" id="translateBtn" onclick="startTranslate()" style="display:none;position:relative;overflow:hidden">🌐 翻译</button>
         <div class="translate-progress" id="translateProgress" style="display:none">
@@ -761,32 +684,58 @@ header .nav .user { color: var(--text3); font-size: 11px; }
   </div>
 </div>
 
-<!-- Chapters Import Dialog -->
+<!-- ═══ Chapters Import Dialog ═══ -->
 <div class="dialog-overlay" id="chaptersDialog">
-  <div class="dialog" style="min-width:420px;max-width:520px">
+  <div class="dialog">
     <h3>📑 检测到多章节文档</h3>
-    <p style="font-size:11px;color:var(--text3);margin-bottom:8px">
-      当前页面包含指向其他章节的链接。请选择要导入的章节：
-    </p>
-    <div class="chapter-count" id="chaptersCount"></div>
+    <p class="dialog-desc">当前页面包含指向其他章节的链接，请选择要导入的章节与导入方式：</p>
+
+    <div class="chapter-count-bar">
+      <span class="ch-count" id="chaptersCount">共 0 个章节</span>
+      <div class="ch-actions">
+        <button onclick="selectAllChapters(true)">全选</button>
+        <button onclick="selectAllChapters(false)">取消</button>
+      </div>
+    </div>
+
     <div class="chapter-list" id="chaptersList"></div>
+
     <div class="chapter-manual-row">
       <input type="url" id="manualChapterUrl" placeholder="手动添加章节 URL...">
-      <button class="btn btn-outline btn-xs" onclick="addManualChapter()">➕ 添加</button>
+      <button class="btn-add" onclick="addManualChapter()">➕ 添加</button>
     </div>
-    <div class="import-mode" id="importModeGroup">
-      <label><input type="radio" name="importMode" value="merge"> 全量导入（一次性下载全部）</label>
-      <label><input type="radio" name="importMode" value="structure" checked> 仅加载结构（按需手动加载）</label>
-      <label><input type="radio" name="importMode" value="separate"> 每章作为独立文档</label>
+
+    <!-- Import Mode: 卡片式选择 -->
+    <div class="import-mode-group" id="importModeGroup">
+      <label class="import-mode-card active" data-mode="structure" onclick="selectImportMode('structure')">
+        <input type="radio" name="importMode" value="structure" checked>
+        <span class="imc-icon">🔗</span>
+        <span class="imc-label">仅结构</span>
+        <span class="imc-desc">保存章节列表，按需点击加载</span>
+      </label>
+      <label class="import-mode-card" data-mode="merge" onclick="selectImportMode('merge')">
+        <input type="radio" name="importMode" value="merge">
+        <span class="imc-icon">📥</span>
+        <span class="imc-label">全量合并</span>
+        <span class="imc-desc">一次性下载全部章节并合并</span>
+      </label>
+      <label class="import-mode-card" data-mode="separate" onclick="selectImportMode('separate')">
+        <input type="radio" name="importMode" value="separate">
+        <span class="imc-icon">📚</span>
+        <span class="imc-label">独立文档</span>
+        <span class="imc-desc">每章作为独立的文档保存</span>
+      </label>
     </div>
+
     <div id="chaptersMsg" class="msg"></div>
     <div class="chapter-import-progress" id="chaptersProgress">
       <div class="chip-progress-text" id="chipProgText"></div>
       <div class="chip-progress-bar"><div class="chip-progress-fill" id="chipProgFill"></div></div>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-outline btn-sm" onclick="closeChaptersDialog()">取消</button>
-      <button class="btn btn-primary btn-sm" id="importChaptersBtn" onclick="startImportChapters()">📥 导入选中章节</button>
+
+    <div class="dialog-btn-row">
+      <button class="btn btn-cancel" onclick="closeChaptersDialog()">取消</button>
+      <button class="btn btn-confirm" id="importChaptersBtn" onclick="startImportChapters()">📥 导入选中章节</button>
     </div>
   </div>
 </div>
@@ -804,7 +753,6 @@ if (!TOKEN) {
   document.getElementById('userInfo').textContent = USER.email || '';
 }
 
-// Unified API fetch: auto-handles auth failures and JSON parsing
 async function fetchApi(url, opts = {}) {
   const headers = opts.headers || {};
   headers['Authorization'] = 'Bearer ' + TOKEN;
@@ -813,7 +761,6 @@ async function fetchApi(url, opts = {}) {
   }
   const res = await fetch(url, {...opts, headers});
   const data = await res.json();
-  // Auth failure (FastAPI default)
   if (data.detail) {
     localStorage.removeItem('mini_agent_token');
     localStorage.removeItem('mini_agent_user');
@@ -826,9 +773,9 @@ async function fetchApi(url, opts = {}) {
 // State
 // ══════════════════════════════════════════════════════════════
 let collections = [];
-let currentDocId = null;       // UUID of currently viewing document
-let currentDocData = null;     // full data from /api/reader/read/{doc_id}
-let currentView = 'interleaved'; // 'interleaved' or 'sbs'
+let currentDocId = null;
+let currentDocData = null;
+let currentView = 'interleaved';
 let translating = false;
 let abortController = null;
 
@@ -870,7 +817,6 @@ function hideProgress() {
   document.getElementById('progressFill').style.width = '0%';
 }
 
-
 // ══════════════════════════════════════════════════════════════
 // Chapters Import
 // ══════════════════════════════════════════════════════════════
@@ -880,7 +826,7 @@ let currentDetectedChapters = [];
 
 function showChaptersDialog(chapters, docId) {
   if (!chapters || !Array.isArray(chapters) || chapters.length === 0) return;
-  
+
   currentChaptersDocId = docId;
   currentDetectedChapters = chapters.slice();
 
@@ -892,14 +838,14 @@ function showChaptersDialog(chapters, docId) {
     const item = document.createElement('div');
     item.className = 'chapter-item';
     item.innerHTML = `
+      <span class="ch-num">${i+1}</span>
       <input type="checkbox" checked data-idx="${i}">
-      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
-        <span class="ch-title" style="font-weight:600;font-size:13px;white-space:normal;word-break:break-word;overflow:visible">${escapeHtml(title)}</span>
-        <span class="ch-url">${escapeHtml(url)}</span>
+      <div class="ch-info">
+        <div class="ch-title">${escapeHtml(title)}</div>
+        <div class="ch-url">${escapeHtml(url)}</div>
       </div>
     `;
-    item.style.display = 'flex';
-    // Toggle checkbox on click (but not on the checkbox itself)
+    // Toggle checkbox on row click
     item.addEventListener('click', (e) => {
       if (e.target.tagName !== 'INPUT') {
         const cb = item.querySelector('input[type="checkbox"]');
@@ -921,16 +867,20 @@ function closeChaptersDialog() {
   document.getElementById('chaptersDialog').classList.remove('show');
 }
 
+function selectAllChapters(selectAll) {
+  document.querySelectorAll('#chaptersList input[type="checkbox"]').forEach(cb => {
+    cb.checked = selectAll;
+  });
+}
+
 function addManualChapter() {
   const input = document.getElementById('manualChapterUrl');
   const url = input.value.trim();
   if (!url) return;
 
-  // Extract a title from the URL
   const title = url.split('/').pop().replace(/[-_]/g, ' ') || url;
   const chapters = currentDetectedChapters;
 
-  // Check for duplicates
   if (chapters.some(c => c.url === url)) {
     showMsg(document.getElementById('chaptersMsg'), '该 URL 已在列表中', 'warn', 3000);
     return;
@@ -939,15 +889,17 @@ function addManualChapter() {
   chapters.push({title: title, url: url});
   input.value = '';
 
-  // Re-render
   const list = document.getElementById('chaptersList');
   const item = document.createElement('div');
   item.className = 'chapter-item';
   const idx = chapters.length - 1;
   item.innerHTML = `
+    <span class="ch-num">${idx+1}</span>
     <input type="checkbox" checked data-idx="${idx}">
-    <span class="ch-title">${escapeHtml(title)}</span>
-    <span class="ch-url">${escapeHtml(url)}</span>
+    <div class="ch-info">
+      <div class="ch-title">${escapeHtml(title)}</div>
+      <div class="ch-url">${escapeHtml(url)}</div>
+    </div>
   `;
   item.addEventListener('click', (e) => {
     if (e.target.tagName !== 'INPUT') {
@@ -959,6 +911,14 @@ function addManualChapter() {
 
   document.getElementById('chaptersCount').textContent = `共 ${chapters.length} 个章节`;
   showMsg(document.getElementById('chaptersMsg'), `✅ 已添加: ${escapeHtml(title)}`, 'success', 2000);
+}
+
+function selectImportMode(mode) {
+  document.querySelectorAll('.import-mode-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.mode === mode);
+  });
+  const radio = document.querySelector(`.import-mode-card[data-mode="${mode}"] input`);
+  if (radio) radio.checked = true;
 }
 
 async function startImportChapters() {
@@ -983,49 +943,7 @@ async function startImportChapters() {
   const prog = document.getElementById('chaptersProgress');
   prog.classList.add('show');
 
-  if (mode === 'structure') {
-    btn.textContent = '⏳ 保存章节结构...';
-    document.getElementById('chipProgText').textContent = `0/${selected.length}`;
-    document.getElementById('chipProgFill').style.width = '0%';
-
-    try {
-      const result = await fetchApi(`/api/reader/import-chapters/${currentChaptersDocId}`, {
-        method: 'POST',
-        body: JSON.stringify({chapters: selected, mode: 'structure'}),
-      });
-
-      if (result.error) {
-        showMsg(document.getElementById('chaptersMsg'), '❌ ' + result.error, 'error');
-        return;
-      }
-
-      const total = result.total || selected.length;
-      const succeeded = result.succeeded || 0;
-      document.getElementById('chipProgText').textContent = `${succeeded}/${total}`;
-      document.getElementById('chipProgFill').style.width = '100%';
-
-      showMsg(document.getElementById('chaptersMsg'), `✅ 章节结构已保存（${succeeded} 个），点击章节即可加载内容`, 'success');
-
-      btn.textContent = '✅ 完成';
-      btn.disabled = false;
-
-      // Refresh sidebar - document now has chapters
-      await loadCollections();
-
-      // Auto-close dialog and show the document with chapters
-      closeChaptersDialog();
-      await selectDocument(currentChaptersDocId);
-
-    } catch (e) {
-      showMsg(document.getElementById('chaptersMsg'), '❌ 保存失败: ' + e.message, 'error');
-      btn.disabled = false;
-      btn.textContent = '📥 导入选中章节';
-    }
-    return;
-  }
-
-  // merge mode - use existing flow with progress bar
-  btn.textContent = '⏳ 全量导入中...';
+  btn.textContent = '⏳ 导入中...';
   document.getElementById('chipProgText').textContent = `0/${selected.length}`;
   document.getElementById('chipProgFill').style.width = '0%';
 
@@ -1037,37 +955,41 @@ async function startImportChapters() {
 
     if (result.error) {
       showMsg(document.getElementById('chaptersMsg'), '❌ ' + result.error, 'error');
+      btn.disabled = false;
+      btn.textContent = '📥 导入选中章节';
       return;
     }
 
     const total = result.total || selected.length;
     const succeeded = result.succeeded || 0;
-    const failed = result.failed || [];
 
     document.getElementById('chipProgText').textContent = `${succeeded}/${total}`;
-    document.getElementById('chipProgFill').style.width = `${(succeeded / total) * 100}%`;
-
-    let msg = `✅ 导入完成：成功 ${succeeded}/${total}`;
-    if (failed.length > 0) {
-      msg += `，失败 ${failed.length}`;
-    }
-    showMsg(document.getElementById('chaptersMsg'), msg, succeeded > 0 ? 'success' : 'error');
-
-    if (succeeded > 0) {
-      // Refresh sidebar
-      await loadCollections();
-
-      if (mode === 'merge') {
-        // Re-select the current doc (which now has more sections)
-        await selectDocument(currentChaptersDocId);
-      }
-    }
+    document.getElementById('chipProgFill').style.width = '100%';
 
     btn.textContent = '✅ 完成';
-    // Close after 2s if all succeeded
-    if (failed.length === 0) {
-      setTimeout(closeChaptersDialog, 2000);
+
+    if (succeeded > 0) {
+      showMsg(document.getElementById('chaptersMsg'), `✅ 导入完成：成功 ${succeeded}/${total}`, 'success');
     }
+
+    // Close dialog and refresh sidebar to show the imported content
+    setTimeout(() => {
+      closeChaptersDialog();
+
+      // Refresh sidebar & auto-expand the target collection
+      loadCollections().then(() => {
+        // Auto-expand the collection containing this doc
+        const docContainer = document.getElementById('docs-' + (collections.find(c =>
+          c.documents && c.documents.some(d => d.id === currentChaptersDocId)
+        )?.id || ''));
+        if (docContainer) {
+          docContainer.classList.add('open');
+          const header = document.querySelector(`.collection-header[data-col-id="${docContainer.id.replace('docs-','')}"]`);
+          if (header) header.querySelector('.arrow').textContent = '▼';
+        }
+      });
+    }, 800);
+
   } catch (e) {
     showMsg(document.getElementById('chaptersMsg'), '❌ 导入失败: ' + e.message, 'error');
     btn.disabled = false;
@@ -1076,7 +998,8 @@ async function startImportChapters() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// View toggle
+// Collections & Sidebar
+// ══════════════════════════════════════════════════════════════
 
 async function loadCollections() {
   try {
@@ -1096,7 +1019,6 @@ function renderCollections() {
   const prevVal = sel.value;
   sel.innerHTML = '<option value="">← 选择目标书架（默认第一个）</option>';
   if (collections && collections.length > 0) {
-    // Keep selected value if still valid
     let found = false;
     collections.forEach(col => {
       const opt = document.createElement('option');
@@ -1116,7 +1038,6 @@ function renderCollections() {
 
   list.innerHTML = '';
   collections.forEach(col => {
-    // Collection header
     const header = document.createElement('div');
     header.className = 'collection-header';
     header.dataset.colId = col.id;
@@ -1131,7 +1052,6 @@ function renderCollections() {
       </span>
     `;
     header.addEventListener('click', (e) => {
-      // Don't toggle if clicking action buttons
       if (e.target.tagName === 'BUTTON') return;
       const container = document.getElementById('docs-' + col.id);
       const isOpen = container.classList.contains('open');
@@ -1139,11 +1059,9 @@ function renderCollections() {
       header.querySelector('.arrow').textContent = isOpen ? '▶' : '▼';
     });
 
-    // Document items container
     const docContainer = document.createElement('div');
     docContainer.className = 'doc-items';
     docContainer.id = 'docs-' + col.id;
-    // Load docs on first open
     loadDocItems(col.id, docContainer, 0);
 
     list.appendChild(header);
@@ -1173,7 +1091,7 @@ async function loadDocItems(collectionId, container, retries) {
       item.addEventListener('click', () => selectDocument(doc.id));
       container.appendChild(item);
 
-      // Also load chapters for this doc in sidebar
+      // Load chapters for this doc in sidebar
       loadSidebarChapters(doc.id, item);
     });
   } catch (e) {
@@ -1189,9 +1107,7 @@ function refreshSidebar() {
 
 // ── Sidebar chapters ─────────────────────────────────────
 
-/** Load chapters for a document and render them in the sidebar */
 async function loadSidebarChapters(docId, docItem) {
-  // Remove previous chapter list if any
   const oldChapters = docItem.querySelector('.sidebar-chapters');
   if (oldChapters) oldChapters.remove();
 
@@ -1199,11 +1115,9 @@ async function loadSidebarChapters(docId, docItem) {
     const data = await fetchApi('/api/reader/documents/' + encodeURIComponent(docId) + '/chapters');
     if (!data || data.error || !data.chapters || data.chapters.length <= 1) return;
 
-    // Only show chapters if there are multiple or if it's a chapter-mode doc
     const container = document.createElement('div');
     container.className = 'sidebar-chapters';
 
-    // Count pending chapters
     const pendingChap = data.chapters.filter(c => !c.has_content);
     const loadedChap = data.chapters.filter(c => c.has_content);
 
@@ -1218,12 +1132,10 @@ async function loadSidebarChapters(docId, docItem) {
         <span class="sch-title">${escapeHtml(ch.title)}</span>
         ${statusText}
       `;
-      // Click always loads content
       chItem.addEventListener('click', () => {
         if (currentDocId === docId) {
           loadChapterContent(ch.sec_index);
         }
-        // Select the document first if not currently viewed
         if (currentDocId !== docId) {
           selectDocument(docId).then(() => loadChapterContent(ch.sec_index));
         }
@@ -1231,7 +1143,6 @@ async function loadSidebarChapters(docId, docItem) {
       container.appendChild(chItem);
     });
 
-    // "全量加载" button (only if there are pending chapters)
     if (pendingChap.length > 0) {
       const loadAll = document.createElement('div');
       loadAll.className = 'chapter-load-all';
@@ -1247,7 +1158,6 @@ async function loadSidebarChapters(docId, docItem) {
   }
 }
 
-/** Update a sidebar chapter's status after lazy fetch */
 function updateSidebarChapterStatus(secIdx, hasContent) {
   const chItems = document.querySelectorAll('.sidebar-chapter');
   chItems.forEach(el => {
@@ -1261,7 +1171,6 @@ function updateSidebarChapterStatus(secIdx, hasContent) {
   });
 }
 
-/** Load ALL pending chapters sequentially with progress */
 async function loadAllPendingChapters(docId, loadAllBtn, allChapters) {
   if (loadAllBtn.classList.contains('loading')) return;
   loadAllBtn.classList.add('loading');
@@ -1308,7 +1217,6 @@ async function selectDocument(docId) {
   currentDocId = docId;
   currentDocData = null;
 
-  // Highlight in sidebar
   document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
   const item = document.querySelector(`.doc-item[data-doc-id="${docId}"]`);
   if (item) item.classList.add('active');
@@ -1330,7 +1238,6 @@ async function selectDocument(docId) {
     document.getElementById('docTitle').textContent = getDocTitle(docId) || '文档';
     document.getElementById('mainHeader').style.display = '';
 
-    // Check if translation is needed
     const hasUntranslated = currentDocData.some(sec =>
       sec.paragraphs.some(p => p.status === 'wait' && !p.skip_translate)
     );
@@ -1342,7 +1249,6 @@ async function selectDocument(docId) {
 
     renderReader();
 
-    // Refresh sidebar chapters for this doc
     const docItem = document.querySelector(`.doc-item[data-doc-id="${docId}"]`);
     if (docItem) loadSidebarChapters(docId, docItem);
   } catch (e) {
@@ -1380,7 +1286,6 @@ function renderReader() {
   const reader = document.getElementById('readerContent');
   reader.innerHTML = '';
 
-  // Check if this is a chapter-mode document (has source_url sections)
   const isChapterMode = currentDocData.some(sec => sec.chapter_mode);
 
   if (isChapterMode) {
@@ -1391,8 +1296,6 @@ function renderReader() {
 }
 
 function renderChapterMode(reader) {
-  // Show all chapter titles as a navigable list
-  // Click to load content from API
   reader.innerHTML = '<div class="chapter-index"><div style="font-size:13px;color:var(--text2);margin-bottom:12px;font-weight:600">📑 选择章节</div></div>';
   const list = reader.querySelector('.chapter-index');
 
@@ -1418,16 +1321,13 @@ async function loadChapterContent(secIdx) {
 
   const reader = document.getElementById('readerContent');
 
-  // Highlight active chapter nav items
   document.querySelectorAll('.chapter-nav-item').forEach(el => {
     el.classList.toggle('active', parseInt(el.dataset.secIdx) === secIdx);
   });
 
-  // Check if this is a pending chapter (structure mode - needs fetch)
   const needsFetch = sec.chapter_mode && (!sec.paragraphs || sec.paragraphs.length === 0 || sec.paragraphs.every(p => !p.orig_html));
 
   if (needsFetch) {
-    // Show loading + fetch from API
     reader.innerHTML = `<div class="loading-indicator"><div class="spinner"></div><span>正在抓取章节内容...</span></div>`;
 
     try {
@@ -1442,7 +1342,6 @@ async function loadChapterContent(secIdx) {
       }
       const data = await res.json();
 
-      // Render the chapter content
       reader.innerHTML = `
         <div class="chapter-topbar">
           <button class="btn btn-outline btn-xs" onclick="showChapterIndex()">← 返回目录</button>
@@ -1454,7 +1353,6 @@ async function loadChapterContent(secIdx) {
       currentChapterIndex = secIdx;
       document.getElementById('docTitle').textContent = data.title || sec.title || '章节';
 
-      // Update sidebar - mark this chapter as loaded
       updateSidebarChapterStatus(secIdx, true);
       return;
     } catch (e) {
@@ -1463,16 +1361,13 @@ async function loadChapterContent(secIdx) {
     }
   }
 
-  // Already has content - load from existing data or section endpoint
   reader.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>加载章节...</span></div>';
 
-  // Highlight in sidebar too
   document.querySelectorAll('.sidebar-chapter').forEach(el => {
     el.classList.toggle('active', parseInt(el.dataset.secIdx) === secIdx);
   });
 
   try {
-    // Try reading from merged paragraph content first
     const mergedHtml = sec.merged_orig_html;
     if (mergedHtml) {
       reader.innerHTML = `
@@ -1487,7 +1382,6 @@ async function loadChapterContent(secIdx) {
       return;
     }
 
-    // Fallback: try section API
     const res = await fetch('/api/reader/section/' + encodeURIComponent(currentDocId) + '/' + secIdx, {
       headers: {'Authorization': 'Bearer ' + TOKEN},
     });
@@ -1522,18 +1416,15 @@ function renderNormalMode(reader) {
   let totalChars = 0;
 
   currentDocData.forEach((sec, secIdx) => {
-    // Section heading
     const heading = document.createElement('div');
     heading.className = 'section-heading';
     heading.textContent = sec.title || ('第 ' + (secIdx + 1) + ' 节');
     reader.appendChild(heading);
 
-    // Merged content: 所有段落融合为连续 HTML
     const contentBlock = document.createElement('div');
     contentBlock.className = 'flowing-content';
     contentBlock.innerHTML = sec.merged_orig_html || '';
 
-    // 如果有翻译，也合并显示
     if (sec.merged_trans_html) {
       const transBlock = document.createElement('div');
       transBlock.className = 'flowing-trans';
@@ -1550,9 +1441,7 @@ function renderNormalMode(reader) {
   }
 }
 
-
 function renderInterleaved(block, para, secIdx, pIdx) {
-  // Skip translate = code block, show just once
   if (para.skip_translate) {
     block.classList.add('code-block');
     block.innerHTML = `
@@ -1565,13 +1454,11 @@ function renderInterleaved(block, para, secIdx, pIdx) {
   const origHtml = para.orig_html || '';
   const transHtml = para.trans_html || '';
 
-  // Original
   const origDiv = document.createElement('div');
   origDiv.className = 'para-orig';
   origDiv.innerHTML = `<span class="para-index">#${pIdx+1}</span>${origHtml}`;
   block.appendChild(origDiv);
 
-  // Translation (or placeholder)
   if (para.status === 'done' && transHtml) {
     const transDiv = document.createElement('div');
     transDiv.className = 'para-trans';
@@ -1605,12 +1492,10 @@ function renderSideBySide(block, para, secIdx, pIdx) {
   const sbs = document.createElement('div');
   sbs.className = 'sbs-container';
 
-  // Left: original
   const origPane = document.createElement('div');
   origPane.className = 'sbs-pane orig-pane';
   origPane.innerHTML = `<div class="pane-label">#${pIdx+1} 原文</div><div>${para.orig_html || ''}</div>`;
 
-  // Right: translation
   const transPane = document.createElement('div');
   transPane.className = 'sbs-pane trans-pane';
   if (para.status === 'done' && para.trans_html) {
@@ -1639,7 +1524,7 @@ function switchView(view) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Import (analyze URL)
+// Import (analyze URL) — MODIFIED FLOW
 // ══════════════════════════════════════════════════════════════
 
 async function analyzeUrl(colId) {
@@ -1690,27 +1575,37 @@ async function analyzeUrl(colId) {
       showMsg(document.getElementById('sidebarMsg'), '❌ ' + data.error, 'error');
       return;
     }
-    showMsg(document.getElementById('sidebarMsg'),
-      `✅ 已导入到"${escapeHtml(findColName(data.document.collection_id))}"：${escapeHtml(data.document.title)} (${formatChars(data.document.total_chars)})`,
-      'success', 5000);
-    document.getElementById('urlInput').value = '';
-    // Refresh sidebar
-    await loadCollections();
-    // Auto-expand the target collection
-    const docContainer = document.getElementById('docs-' + data.document.collection_id);
-    if (docContainer) {
-      docContainer.classList.add('open');
-      const header = document.querySelector(`.collection-header[data-col-id="${data.document.collection_id}"]`);
-      if (header) header.querySelector('.arrow').textContent = '▼';
-    }
-    // Auto-select the new document
-    selectDocument(data.document.id);
 
-    // If detected chapters, show import dialog
+    document.getElementById('urlInput').value = '';
+
+    // Check if there are detected chapters
     const chapters = data.document && data.document.detected_chapters;
-    console.log('[Chapters] detected:', chapters ? chapters.length : 0, chapters ? chapters.slice(0, 2) : []);
+
     if (chapters && Array.isArray(chapters) && chapters.length > 0) {
+      // NEW FLOW: Just show the dialog first, don't select the document yet
+      // The document was created by the API, but we don't show it until chapters are imported
       showChaptersDialog(chapters, data.document.id);
+      // Update sidebar message
+      showMsg(document.getElementById('sidebarMsg'),
+        `✅ 已导入 \"${escapeHtml(data.document.title)}\"（含 ${chapters.length} 个章节），选择章节后确认导入`,
+        'success', 5000);
+    } else {
+      // No chapters: show the document directly (like before)
+      showMsg(document.getElementById('sidebarMsg'),
+        `✅ 已导入到\"${escapeHtml(findColName(data.document.collection_id))}\"：${escapeHtml(data.document.title)} (${formatChars(data.document.total_chars)})`,
+        'success', 5000);
+
+      // Refresh sidebar
+      await loadCollections();
+      // Auto-expand the target collection
+      const docContainer = document.getElementById('docs-' + data.document.collection_id);
+      if (docContainer) {
+        docContainer.classList.add('open');
+        const header = document.querySelector(`.collection-header[data-col-id="${data.document.collection_id}"]`);
+        if (header) header.querySelector('.arrow').textContent = '▼';
+      }
+      // Auto-select the new document
+      selectDocument(data.document.id);
     }
   } catch (e) {
     showMsg(document.getElementById('sidebarMsg'), '❌ 分析失败: ' + e.message, 'error');
@@ -1729,7 +1624,6 @@ async function startTranslate() {
   translating = true;
 
   const engine = document.getElementById('engineSelect').value;
-  console.log(`[Translate] engine=${engine}, doc=${currentDocId}`);
 
   // Switch to progress button
   const btn = document.getElementById('translateBtn');
@@ -1741,7 +1635,6 @@ async function startTranslate() {
   tpf.style.width = '0%';
   tpText.textContent = '⏳ 翻译中...';
 
-  // Also show the old progress bar for reference
   showProgress(0);
 
   try {
@@ -1803,7 +1696,6 @@ async function startTranslate() {
       }
     }
 
-    // Re-read document to get fresh data
     await selectDocument(currentDocId);
 
     showMsg(document.getElementById('sidebarMsg'), `✅ 翻译完成 (${done}/${total})`, 'success', 4000);
@@ -1821,12 +1713,9 @@ async function startTranslate() {
 
 function handleTranslateEvent(event) {
   switch (event.type) {
-    case 'start':
-      break;
-    case 'progress':
-      break;
+    case 'start': break;
+    case 'progress': break;
     case 'para_start': {
-      // Update paragraph status in currentDocData
       const sec = currentDocData?.[event.sec_index];
       if (sec) {
         const para = sec.paragraphs?.[event.para_index];
@@ -1837,7 +1726,6 @@ function handleTranslateEvent(event) {
       break;
     }
     case 'para_done': {
-      // Update the paragraph
       const sec = currentDocData?.[event.sec_index];
       if (sec) {
         const para = sec.paragraphs?.[event.para_index];
@@ -1846,7 +1734,6 @@ function handleTranslateEvent(event) {
           para.trans_html = event.trans_html || '';
         }
       }
-      // Live update this paragraph
       const blocks = document.querySelectorAll('.para-block');
       for (const block of blocks) {
         if (parseInt(block.dataset.secIdx) === event.sec_index &&
@@ -1878,8 +1765,7 @@ function handleTranslateEvent(event) {
       }
       break;
     }
-    case 'all_done':
-      break;
+    case 'all_done': break;
     case 'error':
       showMsg(document.getElementById('sidebarMsg'), '❌ ' + (event.content || '翻译出错'), 'error');
       break;
@@ -1941,7 +1827,6 @@ function showNewDocDialog(colId) {
     showMsg(document.getElementById('sidebarMsg'), '先输入 URL', 'warn', 2000);
     return;
   }
-  // 直接导入到指定书架
   document.getElementById('urlInput').focus();
   analyzeUrl(colId);
 }
@@ -2002,7 +1887,6 @@ async function mergeChapter() {
       `✅ 合并成功：已添加 ${data.added_sections} 章 ${data.added_paragraphs} 段`,
       'success', 4000);
     document.getElementById('mergeInput').style.display = 'none';
-    // Refresh the document view
     await loadCollections();
     selectDocument(currentDocId);
   } catch (e) {
@@ -2032,7 +1916,6 @@ function loadEnginePref() {
 function showTencentConfig() {
   document.getElementById('tencentDialog').classList.add('show');
   document.getElementById('tencentMsg').className = 'msg';
-  // Load existing keys
   loadTencentStatus();
 }
 
@@ -2096,14 +1979,12 @@ async function deleteTencentConfig() {
 // Init
 // ══════════════════════════════════════════════════════════════
 
-// Sidebar collapse toggle
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const isCollapsed = sidebar.classList.toggle('collapsed');
   localStorage.setItem('reader_sidebar_collapsed', isCollapsed ? '1' : '');
 }
 
-// Restore sidebar state
 const sidebar = document.querySelector('.sidebar');
 if (localStorage.getItem('reader_sidebar_collapsed') === '1') {
   sidebar.classList.add('collapsed');
