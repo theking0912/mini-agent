@@ -342,8 +342,8 @@ def _resolve_urls(sections: list[dict], base_url: str):
             prefix = m.group(1)
             val = m.group(2)
             suffix = m.group(3)
-            # Skip if already absolute (has scheme or starts with //)
-            if val.startswith(('http://', 'https://', '//', 'data:', 'mailto:', 'tel:', '#', 'javascript:')):
+            # Skip if already absolute (has scheme or starts with // /api/ /data:)
+            if val.startswith(('http://', 'https://', '//', '/api/', 'data:', 'mailto:', 'tel:', '#', 'javascript:')):
                 return m.group(0)
             abs_url = urljoin(base_url, val)
             return f'{prefix}{abs_url}{suffix}'
