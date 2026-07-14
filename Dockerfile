@@ -13,8 +13,9 @@ COPY . .
 RUN mkdir -p /data && chmod 755 /data
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/models')" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; r = urllib.request.urlopen('http://localhost:8080/api/auth/login'); assert r.status == 200 or r.status == 405" 2>/dev/null || \
+      python -c "import urllib.request; r = urllib.request.urlopen('http://localhost:8080/docs', timeout=5); assert r.status == 200" || exit 1
 
 EXPOSE 8080
 
