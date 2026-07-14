@@ -329,6 +329,131 @@ async def analyze_and_store(url: str, user_id: int, collection_id: str = None) -
 
 
 # ══════════════════════════════════════════════════════════════
+# 合并章节
+# ══════════════════════════════════════════════════════════════
+
+async def merge_to_document(doc_id: str, user_id: int, url: str) -> dict:
+    """将新URL的内容作为新章节合并到已有文档中"""
+    from reader.content_parser import analyze_url
+
+    conn = get_conn_sync()
+    conn.autocommit = True
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        # 1. 验证文档存在且属于该用户
+        cur.execute(
+            "SELECT * FROM documents WHERE id = %s::uuid AND user_id = %s",
+            (doc_id, user_id),
+        )
+        doc = cur.fetchone()
+        if not doc:
+            raise ValueError("文档不存在或无权限")
+
+        # 2. 解析新 URL
+        result = await analyze_url(url)
+        new_sections = result.get("sections", [])
+        if not new_sections:
+            raise ValueError("未能从该URL提取到任何内容")
+
+        page_title = result.get("title", url.split("/")[-1])
+
+        # 3. 获取当前文档已有最大 sec_index
+        cur.execute(
+            "SELECT COALESCE(MAX(sec_index), -1) + 1 AS next_sec FROM sections WHERE document_id = %s::uuid",
+            (doc_id,),
+        )
+        next_sec = (cur.fetchone() or {})["next_sec"]
+
+        # 4. 获取当前文档最大 para_index（跨所有章节）
+        cur.execute(
+            "SELECT COALESCE(MAX(paragraph_index), -1) + 1 AS next_para FROM sections WHERE document_id = %s::uuid",
+            (doc_id,),
+        )
+        next_para = (cur.fetchone() or {})["next_para"]
+
+        added_chars = 0
+        added_paragraphs = 0
+        added_sections = 0
+
+        # 5. 写入新章节/段落
+        for sec_idx_offset, sec in enumerate(new_sections):
+            sec_title = sec.get("title", f"第{next_sec + sec_idx_offset + 1}节")
+            paras = sec.get("paragraphs", [])
+            cur_sec_idx = next_sec + sec_idx_offset
+
+            for para_offset, para in enumerate(paras):
+                para_html = para.get("html", "")
+                para_text = para.get("text", "")
+                char_count = para.get("char_count", 0)
+                skip_translate = para.get("skip_translate", False)
+                cur_para_idx = next_para + added_paragraphs + para_offset
+
+                # 写入 MinIO（失败则静默跳过，DB有回退）
+                orig_key = _para_orig_key(doc_id, cur_sec_idx, cur_para_idx)
+                try:
+                    from core.storage import minio_put
+                    minio_put(
+                        f"reader/{orig_key}",
+                        para_html.encode("utf-8"),
+                        "text/html; charset=utf-8",
+                    )
+                except Exception:
+                    orig_key = ""
+
+                # 插入段落记录
+                cur.execute("""
+                    INSERT INTO sections
+                        (document_id, sec_index, paragraph_index, title,
+                         html_content_key, html_content, text_content,
+                         skip_translate, status, char_count)
+                    VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    doc_id, cur_sec_idx, cur_para_idx, sec_title,
+                    orig_key, para_html, para_text,
+                    skip_translate,
+                    "skip" if skip_translate else "wait",
+                    char_count,
+                ))
+
+                added_chars += char_count
+                added_paragraphs += 1
+
+            added_sections += 1
+
+        # 6. 更新文档统计
+        new_total_chars = (doc["total_chars"] or 0) + added_chars
+        new_total_sections = (doc["total_sections"] or 0) + added_sections
+        cur.execute("""
+            UPDATE documents SET
+                total_chars = %s,
+                total_sections = %s,
+                updated_at = NOW()
+            WHERE id = %s::uuid
+        """, (new_total_chars, new_total_sections, doc_id))
+
+        return {
+            "doc_id": doc_id,
+            "title": doc["title"],
+            "added_sections": added_sections,
+            "added_paragraphs": added_paragraphs,
+            "added_chars": added_chars,
+            "new_total_sections": new_total_sections,
+            "new_total_paragraphs": (doc.get("total_paragraphs") or 0) + added_paragraphs,
+            "new_total_chars": new_total_chars,
+            "merged_title": page_title,
+        }
+
+    except ValueError:
+        raise
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ══════════════════════════════════════════════════════════════
 # 读取段落
 # ══════════════════════════════════════════════════════════════
 
