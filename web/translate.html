@@ -489,6 +489,11 @@ header .nav .user { color: var(--text3); font-size: 11px; }
         <input type="url" id="urlInput" placeholder="https://...">
         <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeUrl()">📥 导入</button>
       </div>
+      <div class="url-row" style="margin-top:6px">
+        <select id="colSelector" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 9px;font-size:12px;outline:none;min-width:0">
+          <option value="">← 选择目标书架（默认第一个）</option>
+        </select>
+      </div>
       <div id="sidebarMsg" class="msg"></div>
     </div>
     <div class="collection-list" id="collectionList">
@@ -606,6 +611,11 @@ function formatChars(n) {
   return (n / 1000).toFixed(1) + 'K字';
 }
 
+function findColName(colId) {
+  const col = collections.find(c => c.id === colId);
+  return col ? col.name : '默认书架';
+}
+
 function showProgress(pct) {
   const bar = document.getElementById('progressBar');
   bar.classList.add('show');
@@ -633,6 +643,23 @@ async function loadCollections() {
 function renderCollections() {
   const list = document.getElementById('collectionList');
   const empty = document.getElementById('sidebarEmpty');
+  const sel = document.getElementById('colSelector');
+
+  // Update collection selector
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="">← 选择目标书架（默认第一个）</option>';
+  if (collections && collections.length > 0) {
+    // Keep selected value if still valid
+    let found = false;
+    collections.forEach(col => {
+      const opt = document.createElement('option');
+      opt.value = col.id;
+      opt.textContent = (col.icon || '📕') + ' ' + col.name;
+      sel.appendChild(opt);
+      if (col.id === prevVal) found = true;
+    });
+    if (found) sel.value = prevVal;
+  }
 
   if (!collections || collections.length === 0) {
     list.innerHTML = '';
@@ -898,7 +925,7 @@ function switchView(view) {
 // Import (analyze URL)
 // ══════════════════════════════════════════════════════════════
 
-async function analyzeUrl() {
+async function analyzeUrl(colId) {
   const url = document.getElementById('urlInput').value.trim();
   if (!url) {
     showMsg(document.getElementById('sidebarMsg'), '请输入 URL', 'error', 3000);
@@ -912,11 +939,11 @@ async function analyzeUrl() {
   // Reload collections first to ensure we have the latest list
   await loadCollections();
 
-  // Ensure there is a collection to import into
-  let targetColId = null;
-  if (collections.length > 0) {
+  // Determine target collection: parameter > dropdown > first
+  let targetColId = colId || document.getElementById('colSelector').value || null;
+  if (!targetColId && collections.length > 0) {
     targetColId = collections[0].id;
-  } else {
+  } else if (!targetColId) {
     // Auto-create a default collection if none exists
     try {
       const newCol = await fetchApi('/api/reader/collections', {
@@ -947,11 +974,18 @@ async function analyzeUrl() {
       return;
     }
     showMsg(document.getElementById('sidebarMsg'),
-      `✅ 分析完成：${escapeHtml(data.document.title)} (${formatChars(data.document.total_chars)})`,
-      'success', 4000);
+      `✅ 已导入到"${escapeHtml(findColName(data.document.collection_id))}"：${escapeHtml(data.document.title)} (${formatChars(data.document.total_chars)})`,
+      'success', 5000);
     document.getElementById('urlInput').value = '';
     // Refresh sidebar
     await loadCollections();
+    // Auto-expand the target collection
+    const docContainer = document.getElementById('docs-' + data.document.collection_id);
+    if (docContainer) {
+      docContainer.classList.add('open');
+      const header = document.querySelector(`.collection-header[data-col-id="${data.document.collection_id}"]`);
+      if (header) header.querySelector('.arrow').textContent = '▼';
+    }
     // Auto-select the new document
     selectDocument(data.document.id);
   } catch (e) {
@@ -1167,9 +1201,9 @@ function showNewDocDialog(colId) {
     showMsg(document.getElementById('sidebarMsg'), '先输入 URL', 'warn', 2000);
     return;
   }
-  // Just trigger analyze with that collection
+  // 直接导入到指定书架
   document.getElementById('urlInput').focus();
-  analyzeUrl();
+  analyzeUrl(colId);
 }
 
 async function deleteDocument() {
