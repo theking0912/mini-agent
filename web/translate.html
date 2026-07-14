@@ -460,6 +460,34 @@ header .nav .user { color: var(--text3); font-size: 11px; }
 .para-block a,.para-orig a,.para-trans a { color: var(--primary); text-decoration: underline; }
 .para-block img,.para-orig img,.para-trans img { max-width: 100%; border-radius: var(--radius-sm); }
 
+/* ── Flowing content (paragraphs merged) ── */
+.flowing-content {
+  line-height: 1.8;
+  font-size: 14px;
+  padding: 0 4px;
+  margin-bottom: 20px;
+}
+.flowing-content h1, .flowing-content h2, .flowing-content h3,
+.flowing-content h4 { color: var(--primary); margin: 16px 0 8px; }
+.flowing-content p { margin: 8px 0; }
+.flowing-content pre { background: var(--surface2); padding: 12px 16px; border-radius: var(--radius-sm); overflow-x: auto; margin: 8px 0; }
+.flowing-content code { background: var(--surface2); padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+.flowing-content pre code { background: none; padding: 0; }
+.flowing-content blockquote { border-left: 3px solid var(--primary); padding: 6px 12px; margin: 8px 0; color: var(--text2); background: rgba(108,92,231,.06); border-radius: 0 4px 4px 0; }
+.flowing-content ul, .flowing-content ol { padding-left: 20px; margin: 6px 0; }
+.flowing-content img { max-width: 100%; border-radius: var(--radius-sm); }
+.flowing-content table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.flowing-content td, .flowing-content th { border: 1px solid var(--border); padding: 6px 10px; }
+.flowing-trans {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  line-height: 1.8;
+  font-size: 14px;
+  color: var(--text2);
+}
+.flowing-trans p { margin: 8px 0; }
+
 /* ── Status badge ── */
 .para-status { font-size: 10px; color: var(--text3); }
 .para-status .wait { color: var(--text3); }
@@ -1442,15 +1470,15 @@ async function loadChapterContent(secIdx) {
   });
 
   try {
-    // Try reading from the paragraph content first
-    const origHtml = sec.paragraphs && sec.paragraphs[0] && sec.paragraphs[0].orig_html;
-    if (origHtml) {
+    // Try reading from merged paragraph content first
+    const mergedHtml = sec.merged_orig_html;
+    if (mergedHtml) {
       reader.innerHTML = `
         <div class="chapter-topbar">
           <button class="btn btn-outline btn-xs" onclick="showChapterIndex()">← 返回目录</button>
           <span class="chapter-title-label">${escapeHtml(sec.title)}</span>
         </div>
-        <div class="chapter-content">${origHtml}</div>
+        <div class="chapter-content">${mergedHtml}</div>
       `;
       currentChapterIndex = secIdx;
       document.getElementById('docTitle').textContent = sec.title || '章节';
@@ -1488,6 +1516,9 @@ function showChapterIndex() {
 }
 
 function renderNormalMode(reader) {
+  reader.innerHTML = '';
+  let totalChars = 0;
+
   currentDocData.forEach((sec, secIdx) => {
     // Section heading
     const heading = document.createElement('div');
@@ -1495,22 +1526,26 @@ function renderNormalMode(reader) {
     heading.textContent = sec.title || ('第 ' + (secIdx + 1) + ' 节');
     reader.appendChild(heading);
 
-    // Paragraphs
-    sec.paragraphs.forEach((para, pIdx) => {
-      const block = document.createElement('div');
-      block.className = 'para-block';
-      block.dataset.secIdx = secIdx;
-      block.dataset.paraIdx = pIdx;
+    // Merged content: 所有段落融合为连续 HTML
+    const contentBlock = document.createElement('div');
+    contentBlock.className = 'flowing-content';
+    contentBlock.innerHTML = sec.merged_orig_html || '';
 
-      if (currentView === 'interleaved') {
-        renderInterleaved(block, para, secIdx, pIdx);
-      } else {
-        renderSideBySide(block, para, secIdx, pIdx);
-      }
+    // 如果有翻译，也合并显示
+    if (sec.merged_trans_html) {
+      const transBlock = document.createElement('div');
+      transBlock.className = 'flowing-trans';
+      transBlock.innerHTML = sec.merged_trans_html;
+      contentBlock.appendChild(transBlock);
+    }
 
-      reader.appendChild(block);
-    });
+    reader.appendChild(contentBlock);
+    totalChars += (sec.merged_orig_html || '').length;
   });
+
+  if (totalChars === 0) {
+    reader.innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>文档内容为空</p></div>';
+  }
 }
 
 

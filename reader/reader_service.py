@@ -1003,6 +1003,23 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
                 "char_count": row["char_count"],
             })
 
+            # 如果这是整章 HTML（单段落保存完整内容），直接用段落原文
+            # 否则合并该章节所有段落原文为连续 HTML
+            sec = sections_map[sec_i]
+            if sec["chapter_mode"] and len(sec["paragraphs"]) == 1:
+                sec["merged_orig_html"] = sec["paragraphs"][0]["orig_html"]
+                sec["merged_trans_html"] = sec["paragraphs"][0].get("trans_html", "") if sec["paragraphs"][0].get("trans_html") else ""
+            else:
+                merged_orig = []
+                merged_trans = []
+                for p in sec["paragraphs"]:
+                    if p["orig_html"]:
+                        merged_orig.append(p["orig_html"])
+                    if p.get("trans_html"):
+                        merged_trans.append(p["trans_html"])
+                sec["merged_orig_html"] = "\n".join(merged_orig)
+                sec["merged_trans_html"] = "\n".join(merged_trans)
+
         # 解析所有相对 URL（兼容旧数据 + 二次保护）
         if doc_url:
             from reader.content_parser import _resolve_urls
