@@ -939,6 +939,26 @@ async def reader_progress(doc_id: str, request: Request):
     return get_translation_progress(doc_id, u["id"])
 
 
+# ── 合并章节 ──────────────────────────────────────────────────
+
+@app.post("/api/reader/merge/{doc_id}")
+async def reader_merge(doc_id: str, request: Request):
+    """将新URL的内容作为新章节合并到已有文档中"""
+    from reader import merge_to_document
+    u = require_user(request)
+    data = await request.json()
+    url = (data.get("url") or "").strip()
+    if not url:
+        return JSONResponse({"error": "URL 不能为空"}, status_code=400)
+    try:
+        result = await merge_to_document(doc_id, u["id"], url)
+        return {"message": "合并成功", **result}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": f"合并失败: {e}"}, status_code=500)
+
+
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8080
     uvicorn.run(app, host="0.0.0.0", port=port)
