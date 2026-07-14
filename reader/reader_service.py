@@ -478,13 +478,15 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
     conn = get_conn_sync()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
-        # 先验证文档归属
+        # 验证文档归属 + 获取 URL
         cur.execute(
-            "SELECT id FROM documents WHERE id = %s::uuid AND user_id = %s",
+            "SELECT id, url FROM documents WHERE id = %s::uuid AND user_id = %s",
             (doc_id, user_id),
         )
-        if not cur.fetchone():
+        doc_row = cur.fetchone()
+        if not doc_row:
             return None
+        doc_url = doc_row["url"] or ""
 
         # 获取所有段落
         cur.execute("""
@@ -543,7 +545,14 @@ def get_sections_with_content(doc_id: str, user_id: int) -> list[dict]:
                 "char_count": row["char_count"],
             })
 
-        return [sections_map[k] for k in sorted(sections_map.keys())]
+        # 解析所有相对 URL（兼容旧数据 + 二次保护）
+        if doc_url:
+            from reader.content_parser import _resolve_urls
+            result = [sections_map[k] for k in sorted(sections_map.keys())]
+            _resolve_urls(result, doc_url)
+        else:
+            result = [sections_map[k] for k in sorted(sections_map.keys())]
+        return result
 
     finally:
         cur.close()
